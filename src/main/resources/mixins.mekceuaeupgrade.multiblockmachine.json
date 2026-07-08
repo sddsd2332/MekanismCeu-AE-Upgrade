@@ -1,0 +1,15 @@
+{
+  "package": "mekceuaeupgrade.mixin.multiblockmachine",
+  "refmap": "mixins.mekceuaeupgrade.refmap.json",
+  "target": "@env(DEFAULT)",
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "MixinTileEntityLargeChemicalInfuser",
+    "MixinTileEntityLargeChemicalWasher",
+    "MixinTileEntityLargeElectrolyticSeparator",
+    "MixinTileEntityLargeSolarNeutronActivator"
+  ],
+  "server": [],
+  "client": []
+}
