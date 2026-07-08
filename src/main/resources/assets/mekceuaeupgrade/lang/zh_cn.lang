@@ -1,0 +1,55 @@
+# Creative tab
+itemGroup.tabmekceuaeupgrade=通用机械CEu：AE升级
+
+# Items
+item.AECraftingUpgrade.name=AE合成升级
+
+# Upgrades
+upgrade.ae_crafting=AE合成
+upgrade.ae_crafting.desc=允许该机器将自身配方暴露为 AE 合成样板，并接收 AE 发配的合成任务。
+
+# AE recipe config GUI
+gui.mekceuaeupgrade.ae_recipe_config.title=AE配方配置
+gui.mekceuaeupgrade.ae_recipe_config.empty=没有可暴露配方
+gui.mekceuaeupgrade.ae_recipe_config.no_match=没有匹配产物
+gui.mekceuaeupgrade.ae_recipe_config.products=产物
+gui.mekceuaeupgrade.ae_recipe_config.products_all=全部产物
+gui.mekceuaeupgrade.ae_recipe_config.products_multi=多路线产物
+gui.mekceuaeupgrade.ae_recipe_config.products_single=单路线产物
+gui.mekceuaeupgrade.ae_recipe_config.search=搜索
+gui.mekceuaeupgrade.ae_recipe_config.routes=路线
+gui.mekceuaeupgrade.ae_recipe_config.enable=启用
+gui.mekceuaeupgrade.ae_recipe_config.disable=关闭
+gui.mekceuaeupgrade.ae_recipe_config.reset_product=重置产物
+gui.mekceuaeupgrade.ae_recipe_config.reset_all=全部重置
+gui.mekceuaeupgrade.ae_recipe_config.multi_route=多路线
+gui.mekceuaeupgrade.ae_recipe_config.global_amount=全局下单
+gui.mekceuaeupgrade.ae_recipe_config.route_amount=路线下单
+gui.mekceuaeupgrade.ae_recipe_config.amount_inherit=继承
+gui.mekceuaeupgrade.ae_recipe_config.route_enabled=已启用
+gui.mekceuaeupgrade.ae_recipe_config.route_partial=部分启用
+gui.mekceuaeupgrade.ae_recipe_config.route_disabled=已关闭
+gui.mekceuaeupgrade.ae_recipe_config.profile_global=全局配置
+gui.mekceuaeupgrade.ae_recipe_config.profile_single=单机配置
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot=配置 %s
+gui.mekceuaeupgrade.ae_recipe_config.filter_blacklist=黑名单
+gui.mekceuaeupgrade.ae_recipe_config.filter_whitelist=白名单
+gui.mekceuaeupgrade.ae_recipe_config.disable_product=全部关闭
+gui.mekceuaeupgrade.ae_recipe_config.enable_all=全部启用
+gui.mekceuaeupgrade.ae_recipe_config.disable_all=全部关闭
+gui.mekceuaeupgrade.ae_recipe_config.move_up=上移
+gui.mekceuaeupgrade.ae_recipe_config.move_down=下移
+gui.mekceuaeupgrade.ae_recipe_config.move_top=最上方
+gui.mekceuaeupgrade.ae_recipe_config.move_bottom=最下方
+gui.mekceuaeupgrade.ae_recipe_config.profile_mode.tooltip=切换全局配置和单机配置。单机配置会为当前机器独立保存设置。
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot.tooltip=切换全局配置槽位 1-10。左键下一项，右键上一项。单机配置时不会显示。
+gui.mekceuaeupgrade.ae_recipe_config.filter_mode.tooltip=切换配方过滤模式。黑名单默认暴露全部配方；白名单只暴露已启用配方。
+gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=切换左侧产物列表的显示范围：全部、多路线、单路线。
+gui.mekceuaeupgrade.ae_recipe_config.search.tooltip=按产物名称过滤左侧列表。右键可清空输入。
+gui.mekceuaeupgrade.ae_recipe_config.toggle_button.tooltip=普通点击：启用或关闭当前选中的路线。按住 Ctrl 点击：关闭当前产物下的全部路线。
+gui.mekceuaeupgrade.ae_recipe_config.move_up_button.tooltip=普通点击：提高当前选中产物或路线的优先级。按住 Ctrl 点击：移动到最上方。
+gui.mekceuaeupgrade.ae_recipe_config.move_down_button.tooltip=普通点击：降低当前选中产物或路线的优先级。按住 Ctrl 点击：移动到最下方。
+gui.mekceuaeupgrade.ae_recipe_config.reset_product.tooltip=重置当前产物的路线启用状态、优先级和下单数量修改。
+gui.mekceuaeupgrade.ae_recipe_config.reset_all.tooltip=重置当前配置中的全部产物和路线修改。按住 Shift 点击可全部启用或全部关闭配方。
+gui.mekceuaeupgrade.ae_recipe_config.global_amount.tooltip=设置默认一次下单数量，回车提交。实际数量会受当前配方上限限制。
+gui.mekceuaeupgrade.ae_recipe_config.route_amount.tooltip=设置当前路线的一次下单数量，留空则继承全局下单数量。

@@ -1,0 +1,55 @@
+# Creative tab
+itemGroup.tabmekceuaeupgrade=Mekanism CEu: AE Upgrade
+
+# Items
+item.AECraftingUpgrade.name=AE Crafting Upgrade
+
+# Upgrades
+upgrade.ae_crafting=AE Crafting
+upgrade.ae_crafting.desc=Allows this machine to expose its recipes as AE crafting patterns and accept AE crafting jobs.
+
+# AE recipe config GUI
+gui.mekceuaeupgrade.ae_recipe_config.title=AE Recipe Config
+gui.mekceuaeupgrade.ae_recipe_config.empty=No exposed recipes
+gui.mekceuaeupgrade.ae_recipe_config.no_match=No matching products
+gui.mekceuaeupgrade.ae_recipe_config.products=Products
+gui.mekceuaeupgrade.ae_recipe_config.products_all=All
+gui.mekceuaeupgrade.ae_recipe_config.products_multi=Multi-route
+gui.mekceuaeupgrade.ae_recipe_config.products_single=Single-route
+gui.mekceuaeupgrade.ae_recipe_config.search=Search
+gui.mekceuaeupgrade.ae_recipe_config.routes=Routes
+gui.mekceuaeupgrade.ae_recipe_config.enable=Enable
+gui.mekceuaeupgrade.ae_recipe_config.disable=Disable
+gui.mekceuaeupgrade.ae_recipe_config.reset_product=Reset Product
+gui.mekceuaeupgrade.ae_recipe_config.reset_all=Reset All
+gui.mekceuaeupgrade.ae_recipe_config.multi_route=Multiple routes
+gui.mekceuaeupgrade.ae_recipe_config.global_amount=Global Qty
+gui.mekceuaeupgrade.ae_recipe_config.route_amount=Route Qty
+gui.mekceuaeupgrade.ae_recipe_config.amount_inherit=Inherit
+gui.mekceuaeupgrade.ae_recipe_config.route_enabled=Enabled
+gui.mekceuaeupgrade.ae_recipe_config.route_partial=Partially enabled
+gui.mekceuaeupgrade.ae_recipe_config.route_disabled=Disabled
+gui.mekceuaeupgrade.ae_recipe_config.profile_global=Global
+gui.mekceuaeupgrade.ae_recipe_config.profile_single=Per Machine
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot=Config %s
+gui.mekceuaeupgrade.ae_recipe_config.filter_blacklist=Blacklist
+gui.mekceuaeupgrade.ae_recipe_config.filter_whitelist=Whitelist
+gui.mekceuaeupgrade.ae_recipe_config.disable_product=Disable All
+gui.mekceuaeupgrade.ae_recipe_config.enable_all=Enable All
+gui.mekceuaeupgrade.ae_recipe_config.disable_all=Disable All
+gui.mekceuaeupgrade.ae_recipe_config.move_up=Up
+gui.mekceuaeupgrade.ae_recipe_config.move_down=Down
+gui.mekceuaeupgrade.ae_recipe_config.move_top=Top
+gui.mekceuaeupgrade.ae_recipe_config.move_bottom=Bottom
+gui.mekceuaeupgrade.ae_recipe_config.profile_mode.tooltip=Switch between global and per-machine config. Per-machine config stores settings for this machine only.
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot.tooltip=Switch global config slot 1-10. Left-click next, right-click previous. Hidden while using per-machine config.
+gui.mekceuaeupgrade.ae_recipe_config.filter_mode.tooltip=Switch recipe filter mode. Blacklist exposes every recipe by default; whitelist exposes only enabled recipes.
+gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=Change the left product list filter: all, multi-route, or single-route.
+gui.mekceuaeupgrade.ae_recipe_config.search.tooltip=Filter the left list by product name. Right-click to clear the input.
+gui.mekceuaeupgrade.ae_recipe_config.toggle_button.tooltip=Click: enable or disable the selected route. Hold Ctrl and click: disable every route for the selected product.
+gui.mekceuaeupgrade.ae_recipe_config.move_up_button.tooltip=Click: raise the priority of the selected product or route. Hold Ctrl and click: move it to the top.
+gui.mekceuaeupgrade.ae_recipe_config.move_down_button.tooltip=Click: lower the priority of the selected product or route. Hold Ctrl and click: move it to the bottom.
+gui.mekceuaeupgrade.ae_recipe_config.reset_product.tooltip=Reset route enabled state, priority, and craft amount changes for the selected product.
+gui.mekceuaeupgrade.ae_recipe_config.reset_all.tooltip=Reset all product and route changes in this config. Hold Shift and click to enable or disable every recipe.
+gui.mekceuaeupgrade.ae_recipe_config.global_amount.tooltip=Set the default craft request amount, then press Enter. The actual value is limited by the current recipe.
+gui.mekceuaeupgrade.ae_recipe_config.route_amount.tooltip=Set the craft request amount for the selected route. Leave empty to inherit the global amount.

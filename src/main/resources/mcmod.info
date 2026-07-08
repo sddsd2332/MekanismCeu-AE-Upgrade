@@ -1,0 +1,26 @@
+[
+  {
+    "modid": "mekceuaeupgrade",
+    "name": "MekanismCeu-AE-Upgrade",
+    "version": "1.0.0",
+    "mcversion": "1.12.2",
+    "description": "Adds AE2 crafting upgrade support to Mekanism CEu machines",
+    "authorList": ["sddsd2332"],
+    "credits": "sddsd2332",
+    "url": "https://github.com/sddsd2332/MekanismCeu-AE-Upgrade",
+    "updateJSON": "",
+    "logoFile": "",
+    "useDependencyInformation": true,
+    "dependencies": [
+      "mekanism",
+      "ae2",
+      "mekeng"
+    ],
+    "requiredMods": [
+      "forge@[14.23.5.2768,)",
+      "mekanism",
+      "ae2",
+      "mekeng"
+    ]
+  }
+]

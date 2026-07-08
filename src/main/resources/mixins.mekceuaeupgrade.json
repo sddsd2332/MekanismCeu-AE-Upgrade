@@ -1,0 +1,42 @@
+{
+  "required": true,
+  "package": "mekceuaeupgrade.mixin",
+  "plugin": "mekceuaeupgrade.mixin.MEKCeuAEUpgradeMixin",
+  "refmap": "mixins.mekceuaeupgrade.refmap.json",
+  "target": "@env(MOD)",
+  "minVersion": "0.8.7",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "ae2.MixinNetworkCraftingProvidersPatternsForKey",
+    "mekanism.MixinItemConfigurationCard",
+    "mekanism.MixinTileComponentUpgrade",
+    "mekanism.MixinTileEntityAdvancedElectricMachine",
+    "mekanism.MixinTileEntityAntiprotonicNucleosynthesizer",
+    "mekanism.MixinTileEntityBasicBlock",
+    "mekanism.MixinTileEntityBasicMachine",
+    "mekanism.MixinTileEntityChanceMachine",
+    "mekanism.MixinTileEntityChanceMachine2",
+    "mekanism.MixinTileEntityChemicalCrystallizer",
+    "mekanism.MixinTileEntityChemicalDissolutionChamber",
+    "mekanism.MixinTileEntityChemicalInfuser",
+    "mekanism.MixinTileEntityChemicalOxidizer",
+    "mekanism.MixinTileEntityChemicalWasher",
+    "mekanism.MixinTileEntityDoubleElectricMachine",
+    "mekanism.MixinTileEntityElectricBlock",
+    "mekanism.MixinTileEntityElectricMachine",
+    "mekanism.MixinTileEntityElectrolyticSeparator",
+    "mekanism.MixinTileEntityFactory",
+    "mekanism.MixinTileEntityFarmMachine",
+    "mekanism.MixinTileEntityIsotopicCentrifuge",
+    "mekanism.MixinTileEntityMetallurgicInfuser",
+    "mekanism.MixinTileEntityNutritionalLiquifier",
+    "mekanism.MixinTileEntityPRC",
+    "mekanism.MixinTileEntityRotaryCondensentrator",
+    "mekanism.MixinTileEntitySolarNeutronActivator"
+  ],
+  "server": [],
+  "client": [
+    "mekanism.MixinGuiMekanismTile"
+  ],
+  "setSourceFile": true
+}

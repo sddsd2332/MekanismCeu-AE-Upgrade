@@ -1,0 +1,40 @@
+package mekceuaeupgrade.mixin.mekanism;
+
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.host.IAEUpgradeHost;
+import mekceuaeupgrade.common.item.AEUpgrade;
+
+import mekanism.common.Upgrade;
+import mekanism.common.recipe.cache.IRecipeLookupHandler;
+import mekanism.common.tile.component.TileComponentUpgrade;
+import mekanism.common.tile.prefab.TileEntityContainerBlock;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(value = TileComponentUpgrade.class, remap = false)
+public abstract class MixinTileComponentUpgrade {
+
+    @Shadow
+    public abstract void setSupported(Upgrade upgrade);
+
+    @Inject(method = "<init>(Lmekanism/common/tile/prefab/TileEntityContainerBlock;)V", at = @At("RETURN"))
+    private void mekceuaeupgrade$addImplicitAEUpgrade(TileEntityContainerBlock tile, CallbackInfo ci) {
+        mekceuaeupgrade$addImplicitAEUpgrade(tile);
+    }
+
+    @Inject(method = "<init>(Lmekanism/common/tile/prefab/TileEntityContainerBlock;Lmekanism/common/Upgrade;)V", at = @At("RETURN"))
+    private void mekceuaeupgrade$addImplicitAEUpgrade(TileEntityContainerBlock tile, Upgrade upgrade, CallbackInfo ci) {
+        mekceuaeupgrade$addImplicitAEUpgrade(tile);
+    }
+
+    @Unique
+    private void mekceuaeupgrade$addImplicitAEUpgrade(TileEntityContainerBlock tile) {
+        if (tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost) {
+            setSupported(AEUpgrade.AE_CRAFTING);
+        }
+    }
+}

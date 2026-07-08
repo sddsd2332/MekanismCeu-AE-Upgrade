@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "package": "mekceuaeupgrade.mixin.mekceumoremachine",
+  "plugin": "mekceuaeupgrade.mixin.MEKCeuAEUpgradeMixin",
+  "refmap": "mixins.mekceuaeupgrade.refmap.json",
+  "target": "@env(MOD)",
+  "minVersion": "0.8.7",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "MixinTileEntityTierChemicalInfuser",
+    "MixinTileEntityTierChemicalOxidizer",
+    "MixinTileEntityTierChemicalWasher",
+    "MixinTileEntityTierChemicalCrystallizer",
+    "MixinTileEntityTierChemicalDissolutionChamber",
+    "MixinTileEntityTierElectrolyticSeparator",
+    "MixinTileEntityTierIsotopicCentrifuge",
+    "MixinTileEntityTierNutritionalLiquifier",
+    "MixinTileEntityTierRotaryCondensentrator",
+    "MixinTileEntityTierSolarNeutronActivator",
+    "MixinTileEntityReplicatorFluidStack",
+    "MixinTileEntityReplicatorGases",
+    "MixinTileEntityReplicatorItemStack"
+  ],
+  "server": [],
+  "client": [],
+  "setSourceFile": true
+}

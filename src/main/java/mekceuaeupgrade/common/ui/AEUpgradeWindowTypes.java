@@ -1,0 +1,19 @@
+package mekceuaeupgrade.common.ui;
+
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+
+import mekanism.common.config.MekanismConfig;
+import mekanism.common.inventory.container.SelectedWindowData.WindowType;
+import net.minecraft.util.ResourceLocation;
+
+public final class AEUpgradeWindowTypes {
+
+    public static final WindowType AE_RECIPE_CONFIG = WindowType.register(new ResourceLocation(MEKCeuAEUpgrade.MODID, "ae_recipe_config"), "ae_recipe_config", true);
+
+    private AEUpgradeWindowTypes() {
+    }
+
+    public static void init() {
+        MekanismConfig.local().client.registerWindowType(AE_RECIPE_CONFIG);
+    }
+}
