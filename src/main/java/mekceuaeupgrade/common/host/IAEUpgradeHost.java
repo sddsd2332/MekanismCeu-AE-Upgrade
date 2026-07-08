@@ -4,18 +4,28 @@ import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 
 import ae2.api.crafting.IPatternDetails;
+import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.networking.security.IActionHost;
+import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.util.AECableType;
+import ae2.text.TextComponentItemStack;
 import mekanism.common.base.IUpgradeTile;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraft.world.IWorldNameable;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.List;
 
 public interface IAEUpgradeHost extends IInWorldGridNodeHost, IActionHost, ICraftingProvider {
@@ -92,5 +102,74 @@ public interface IAEUpgradeHost extends IInWorldGridNodeHost, IActionHost, ICraf
     @Override
     default boolean isBusy() {
         return getAEUpgradeNode().isBusy();
+    }
+
+    @Override
+    default PatternContainerGroup getTerminalGroup() {
+        if (!(this instanceof TileEntity tile)) {
+            return PatternContainerGroup.nothing();
+        }
+        ItemStack displayStack = getAEUpgradeMachineDisplayStack(tile);
+        AEItemKey icon = AEItemKey.of(displayStack);
+        ITextComponent name = getAEUpgradeMachineDisplayName(tile, displayStack);
+        return new PatternContainerGroup(icon, name, Collections.emptyList());
+    }
+
+    static ItemStack getAEUpgradeMachineDisplayStack(TileEntity tile) {
+        if (tile.getWorld() == null) {
+            return ItemStack.EMPTY;
+        }
+        Item item = Item.getItemFromBlock(tile.getBlockType());
+        if (item == null) {
+            return ItemStack.EMPTY;
+        }
+        int metadata = 0;
+        try {
+            metadata = tile.getBlockType().getMetaFromState(tile.getWorld().getBlockState(tile.getPos()));
+        } catch (RuntimeException | LinkageError ignored) {
+            metadata = 0;
+        }
+        return new ItemStack(item, 1, metadata);
+    }
+
+    static ITextComponent getAEUpgradeMachineDisplayName(TileEntity tile, ItemStack displayStack) {
+        if (tile instanceof IWorldNameable nameable) {
+            if (nameable.hasCustomName()) {
+                ITextComponent displayName = getAEUpgradeSafeDisplayName(nameable);
+                if (displayName != null) {
+                    return displayName;
+                }
+            }
+            String name = getAEUpgradeSafeName(nameable);
+            if (name != null && !name.isEmpty()) {
+                return new TextComponentString(name);
+            }
+        }
+        if (!displayStack.isEmpty()) {
+            return TextComponentItemStack.of(displayStack);
+        }
+        try {
+            return new TextComponentTranslation(tile.getBlockType().getTranslationKey() + ".name");
+        } catch (RuntimeException | LinkageError ignored) {
+            return new TextComponentString(tile.getClass().getSimpleName());
+        }
+    }
+
+    @Nullable
+    static ITextComponent getAEUpgradeSafeDisplayName(IWorldNameable nameable) {
+        try {
+            return nameable.getDisplayName();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    static String getAEUpgradeSafeName(IWorldNameable nameable) {
+        try {
+            return nameable.getName();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
     }
 }
