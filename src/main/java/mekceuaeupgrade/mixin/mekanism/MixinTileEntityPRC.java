@@ -67,4 +67,5 @@ public abstract class MixinTileEntityPRC extends TileEntityUpgradeableMachine<Pr
         }
         return mekceuaeupgrade$aeRecipeAdapter;
     }
+
 }

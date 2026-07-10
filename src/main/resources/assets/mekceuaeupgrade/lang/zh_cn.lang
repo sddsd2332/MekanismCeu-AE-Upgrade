@@ -3,19 +3,45 @@ itemGroup.tabmekceuaeupgrade=通用机械CEu：AE升级
 
 # Items
 item.AECraftingUpgrade.name=AE合成升级
+item.AEOutputUpgrade.name=AE输出升级
+item.AEAutoProcessingUpgrade.name=AE自动处理升级
+item.AEWirelessCraftingUpgrade.name=无线AE合成升级
+item.AEWirelessAutoProcessingUpgrade.name=无线AE自动处理升级
+item.AEWirelessOutputUpgrade.name=无线AE输出升级
 
 # Upgrades
 upgrade.ae_crafting=AE合成
 upgrade.ae_crafting.desc=允许该机器将自身配方暴露为 AE 合成样板，并接收 AE 发配的合成任务。
+upgrade.ae_output=AE输出
+upgrade.ae_output.desc=允许该机器将自身物品、气体和流体输出写入已连接的 AE 网络。
+upgrade.ae_auto_processing=AE自动处理
+upgrade.ae_auto_processing.desc=允许该机器从已连接的 AE 网络抽取已启用配方的输入，并自动执行处理。
+upgrade.ae_wireless_crafting=无线AE合成
+upgrade.ae_wireless_crafting.desc=允许该机器通过安全终端绑定的 AE 网络暴露自身配方，并接收 AE 发配的合成任务。
+upgrade.ae_wireless_auto_processing=无线AE自动处理
+upgrade.ae_wireless_auto_processing.desc=允许该机器通过安全终端绑定的 AE 网络抽取已启用配方的输入，并自动执行处理。
+upgrade.ae_wireless_output=无线AE输出
+upgrade.ae_wireless_output.desc=允许该机器通过安全终端绑定的 AE 网络将物品、气体和流体输出写入 AE。
+
+# Wireless upgrade tooltip
+tooltip.mekceuaeupgrade.wireless_unlinked=未链接到 AE 网络
+tooltip.mekceuaeupgrade.wireless_linked=已链接到 AE 网络
+tooltip.mekceuaeupgrade.wireless_location=网络位置
+tooltip.mekceuaeupgrade.wireless_location_unavailable=网络位置当前不可用
+tooltip.mekceuaeupgrade.wireless_cleared=已清空无线 AE 网络绑定
+tooltip.mekceuaeupgrade.wireless_already_unlinked=该无线升级尚未绑定 AE 网络
+tooltip.mekceuaeupgrade.wireless_install_unlinked=请先在 AE 安全终端绑定无线升级
 
 # AE recipe config GUI
 gui.mekceuaeupgrade.ae_recipe_config.title=AE配方配置
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.title=AE自动处理配置
 gui.mekceuaeupgrade.ae_recipe_config.empty=没有可暴露配方
 gui.mekceuaeupgrade.ae_recipe_config.no_match=没有匹配产物
 gui.mekceuaeupgrade.ae_recipe_config.products=产物
 gui.mekceuaeupgrade.ae_recipe_config.products_all=全部产物
 gui.mekceuaeupgrade.ae_recipe_config.products_multi=多路线产物
 gui.mekceuaeupgrade.ae_recipe_config.products_single=单路线产物
+gui.mekceuaeupgrade.ae_recipe_config.products_self_referential=输入输出相同
 gui.mekceuaeupgrade.ae_recipe_config.search=搜索
 gui.mekceuaeupgrade.ae_recipe_config.routes=路线
 gui.mekceuaeupgrade.ae_recipe_config.enable=启用
@@ -29,6 +55,7 @@ gui.mekceuaeupgrade.ae_recipe_config.amount_inherit=继承
 gui.mekceuaeupgrade.ae_recipe_config.route_enabled=已启用
 gui.mekceuaeupgrade.ae_recipe_config.route_partial=部分启用
 gui.mekceuaeupgrade.ae_recipe_config.route_disabled=已关闭
+gui.mekceuaeupgrade.ae_recipe_config.route_self_referential=输入与输出包含相同资源，不会添加到 AE；仅供查看
 gui.mekceuaeupgrade.ae_recipe_config.profile_global=全局配置
 gui.mekceuaeupgrade.ae_recipe_config.profile_single=单机配置
 gui.mekceuaeupgrade.ae_recipe_config.profile_slot=配置 %s
@@ -44,7 +71,8 @@ gui.mekceuaeupgrade.ae_recipe_config.move_bottom=最下方
 gui.mekceuaeupgrade.ae_recipe_config.profile_mode.tooltip=切换全局配置和单机配置。单机配置会为当前机器独立保存设置。
 gui.mekceuaeupgrade.ae_recipe_config.profile_slot.tooltip=切换全局配置槽位 1-10。左键下一项，右键上一项。单机配置时不会显示。
 gui.mekceuaeupgrade.ae_recipe_config.filter_mode.tooltip=切换配方过滤模式。黑名单默认暴露全部配方；白名单只暴露已启用配方。
-gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=切换左侧产物列表的显示范围：全部、多路线、单路线。
+gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=切换左侧产物列表的显示范围：全部、多路线、单路线、输入输出相同。
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.product_filter.tooltip=切换左侧产物列表的显示范围：全部、多路线、单路线。
 gui.mekceuaeupgrade.ae_recipe_config.search.tooltip=按产物名称过滤左侧列表。右键可清空输入。
 gui.mekceuaeupgrade.ae_recipe_config.toggle_button.tooltip=普通点击：启用或关闭当前选中的路线。按住 Ctrl 点击：关闭当前产物下的全部路线。
 gui.mekceuaeupgrade.ae_recipe_config.move_up_button.tooltip=普通点击：提高当前选中产物或路线的优先级。按住 Ctrl 点击：移动到最上方。

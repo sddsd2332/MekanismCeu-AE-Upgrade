@@ -28,6 +28,7 @@ public class AERecipeConfigSnapshot {
     private static final String CRAFT_AMOUNT = "craftAmount";
     private static final String ROUTE_CRAFT_AMOUNT = "routeCraftAmount";
     private static final String ROUTE_CRAFT_AMOUNT_OVERRIDE = "routeCraftAmountOverride";
+    private static final String MODIFIABLE = "modifiable";
 
     public static final AERecipeConfigSnapshot EMPTY = new AERecipeConfigSnapshot(Collections.emptyList(), false, 1, AERecipeProfile.DEFAULT_CRAFT_AMOUNT,
           AERecipeProfile.RouteFilterMode.BLACKLIST);
@@ -120,6 +121,7 @@ public class AERecipeConfigSnapshot {
                 routeTag.setInteger(ORDER, route.getOrder());
                 routeTag.setInteger(ROUTE_CRAFT_AMOUNT, route.getCraftAmount());
                 routeTag.setBoolean(ROUTE_CRAFT_AMOUNT_OVERRIDE, route.hasCraftAmountOverride());
+                routeTag.setBoolean(MODIFIABLE, route.isModifiable());
                 routeList.appendTag(routeTag);
             }
             productTag.setTag(ROUTES, routeList);
@@ -167,7 +169,8 @@ public class AERecipeConfigSnapshot {
                       routeTag.getBoolean(ENABLED),
                       routeTag.getInteger(ORDER),
                       routeTag.hasKey(ROUTE_CRAFT_AMOUNT, NBT.TAG_INT) ? routeTag.getInteger(ROUTE_CRAFT_AMOUNT) : AERecipeProfile.DEFAULT_CRAFT_AMOUNT,
-                      routeTag.getBoolean(ROUTE_CRAFT_AMOUNT_OVERRIDE)
+                      routeTag.getBoolean(ROUTE_CRAFT_AMOUNT_OVERRIDE),
+                      !routeTag.hasKey(MODIFIABLE, NBT.TAG_BYTE) || routeTag.getBoolean(MODIFIABLE)
                 ));
             }
             if (routes.isEmpty()) {
@@ -262,7 +265,9 @@ public class AERecipeConfigSnapshot {
         public int getMaxCraftAmount() {
             int maxCraftAmount = AERecipeProfile.MAX_CRAFT_AMOUNT;
             for (Route route : routes) {
-                maxCraftAmount = Math.min(maxCraftAmount, route.getMaxCraftAmount());
+                if (route.isModifiable()) {
+                    maxCraftAmount = Math.min(maxCraftAmount, route.getMaxCraftAmount());
+                }
             }
             return maxCraftAmount;
         }
@@ -278,6 +283,7 @@ public class AERecipeConfigSnapshot {
         private final int order;
         private final int craftAmount;
         private final boolean craftAmountOverride;
+        private final boolean modifiable;
 
         public Route(String routeKey, ItemStack inputStack, ItemStack outputStack, boolean enabled, int order) {
             this(routeKey, Collections.singletonList(inputStack), outputStack, enabled, order);
@@ -293,14 +299,20 @@ public class AERecipeConfigSnapshot {
 
         public Route(String routeKey, List<ItemStack> inputStacks, List<ItemStack> outputStacks, boolean enabled, int order, int craftAmount,
               boolean craftAmountOverride) {
+            this(routeKey, inputStacks, outputStacks, enabled, order, craftAmount, craftAmountOverride, true);
+        }
+
+        public Route(String routeKey, List<ItemStack> inputStacks, List<ItemStack> outputStacks, boolean enabled, int order, int craftAmount,
+              boolean craftAmountOverride, boolean modifiable) {
             this.routeKey = routeKey;
             this.inputStacks = Collections.unmodifiableList(copyStacks(inputStacks));
             this.outputStacks = Collections.unmodifiableList(copyStacks(outputStacks));
             this.outputStack = this.outputStacks.isEmpty() ? ItemStack.EMPTY : this.outputStacks.get(0);
-            this.enabled = enabled;
+            this.enabled = modifiable && enabled;
             this.order = order;
             this.craftAmount = AERecipeProfile.clampCraftAmount(craftAmount, getMaxCraftAmount());
-            this.craftAmountOverride = craftAmountOverride;
+            this.craftAmountOverride = modifiable && craftAmountOverride;
+            this.modifiable = modifiable;
         }
 
         public String getRouteKey() {
@@ -341,6 +353,10 @@ public class AERecipeConfigSnapshot {
 
         public boolean hasCraftAmountOverride() {
             return craftAmountOverride;
+        }
+
+        public boolean isModifiable() {
+            return modifiable;
         }
 
         public int getMaxCraftAmount() {

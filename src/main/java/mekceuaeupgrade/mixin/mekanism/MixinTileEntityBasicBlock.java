@@ -3,14 +3,18 @@ package mekceuaeupgrade.mixin.mekanism;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 
+import mekanism.common.concurrent.TaskExecutor;
 import mekanism.common.tile.base.TileEntityRestrictedTick;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
+import mekanism.common.util.concurrent.Action;
+import mekanism.common.util.concurrent.ActionExecutor;
 import net.minecraft.block.Block;
 import net.minecraft.nbt.NBTTagCompound;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import javax.annotation.Nullable;
@@ -73,6 +77,35 @@ public abstract class MixinTileEntityBasicBlock extends TileEntityRestrictedTick
         if (bridge != null) {
             bridge.mekceuaeupgrade$writeAEUpgrade(nbtTags);
         }
+    }
+
+    @Inject(method = "onUpdateServer", at = @At("TAIL"))
+    private void mekceuaeupgrade$onUpdateServer(CallbackInfo ci) {
+        if (((TileEntityBasicBlock) (Object) this).supportsAsync()) {
+            return;
+        }
+        IAEUpgradeHostBridge bridge = mekceuaeupgrade$getAEBridge();
+        if (bridge != null) {
+            bridge.mekceuaeupgrade$tickAEUpgradeServer();
+        }
+    }
+
+    @Redirect(
+          method = "doRestrictedTick",
+          at = @At(
+                value = "INVOKE",
+                target = "Lmekanism/common/concurrent/TaskExecutor;addTask(Lmekanism/common/util/concurrent/Action;)Lmekanism/common/util/concurrent/ActionExecutor;"
+          )
+    )
+    private ActionExecutor mekceuaeupgrade$wrapAsyncUpdateServer(TaskExecutor executor, Action action) {
+        IAEUpgradeHostBridge bridge = mekceuaeupgrade$getAEBridge();
+        if (bridge == null) {
+            return executor.addTask(action);
+        }
+        return executor.addTask(() -> {
+            action.doAction();
+            executor.addSyncTask(bridge::mekceuaeupgrade$tickAEUpgradeServer);
+        });
     }
 
     @Unique

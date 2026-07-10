@@ -1,0 +1,13 @@
+{
+  "package": "mekceuaeupgrade.mixin",
+  "refmap": "mixins.mekceuaeupgrade.refmap.json",
+  "target": "@env(DEFAULT)",
+  "minVersion": "0.8",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "appeng.MixinCraftingGridCache",
+    "appeng.MixinNetworkMonitor"
+  ],
+  "server": [],
+  "client": []
+}

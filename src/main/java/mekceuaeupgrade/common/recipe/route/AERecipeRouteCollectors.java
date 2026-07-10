@@ -70,7 +70,7 @@ public final class AERecipeRouteCollectors {
             }
             for (ItemStack expandedInput : AERecipeItemInputs.expand(input, candidate -> itemToGasRecipeMatches(recipes, candidate, output))) {
                 routes.add(AERecipeRoute.builder("route:item_to_gas")
-                      .inputItem("item", expandedInput)
+                      .inputItem("item_input", expandedInput)
                       .outputGas("gas_output", output)
                       .build());
             }

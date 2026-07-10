@@ -7,6 +7,7 @@
   "mixins": [
     "mekanism.MixinItemConfigurationCard",
     "mekanism.MixinTileComponentUpgrade",
+    "mekanism.MixinTileEntityAmbientAccumulatorEnergy",
     "mekanism.MixinTileEntityAdvancedElectricMachine",
     "mekanism.MixinTileEntityAntiprotonicNucleosynthesizer",
     "mekanism.MixinTileEntityBasicBlock",
@@ -19,8 +20,9 @@
     "mekanism.MixinTileEntityChemicalOxidizer",
     "mekanism.MixinTileEntityChemicalWasher",
     "mekanism.MixinTileEntityDoubleElectricMachine",
-    "mekanism.MixinTileEntityElectricBlock",
+    "mekanism.MixinTileEntityDigitalMiner",
     "mekanism.MixinTileEntityElectricMachine",
+    "mekanism.MixinTileEntityElectricPump",
     "mekanism.MixinTileEntityElectrolyticSeparator",
     "mekanism.MixinTileEntityFactory",
     "mekanism.MixinTileEntityFarmMachine",

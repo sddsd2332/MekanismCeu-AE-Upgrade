@@ -1,8 +1,8 @@
 package mekceuaeupgrade.client.gui;
 
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
-import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.ui.AELang;
 import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
 
@@ -10,7 +10,6 @@ import mekanism.client.SpecialColors;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.tab.window.GuiWindowCreatorTab;
 import mekanism.client.gui.element.window.GuiWindow;
-import mekanism.common.base.IUpgradeTile;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
 import mekanism.common.util.MekanismUtils;
@@ -24,35 +23,49 @@ import java.util.function.Supplier;
 public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityContainerBlock, GuiAERecipeConfigWindowTab> {
 
     private static final ResourceLocation AE_RECIPE_CONFIG = MekanismUtils.getResource(MekanismUtils.ResourceType.TEXTURE_ITEMS, "craftingformulaencoded.png");
-    private static final SelectedWindowData WINDOW_DATA = new SelectedWindowData(AEUpgradeWindowTypes.AE_RECIPE_CONFIG);
 
+    protected final AERecipeConfigType configType;
     private boolean windowOpen;
 
     public GuiAERecipeConfigWindowTab(IGuiWrapper gui, TileEntityContainerBlock tile, Supplier<GuiAERecipeConfigWindowTab> elementSupplier) {
-        super(AE_RECIPE_CONFIG, gui, tile, gui.getWidth() + 24, 6, 26, 18, false, elementSupplier);
-        visible = canOpen(tile);
+        this(gui, tile, elementSupplier, AERecipeConfigType.CRAFTING, 6);
+    }
+
+    protected GuiAERecipeConfigWindowTab(IGuiWrapper gui, TileEntityContainerBlock tile, Supplier<GuiAERecipeConfigWindowTab> elementSupplier,
+          AERecipeConfigType configType, int y) {
+        super(AE_RECIPE_CONFIG, gui, tile, gui.getWidth() + 24, y, 26, 18, false, elementSupplier);
+        this.configType = configType;
+        visible = canOpen(tile, configType);
         active = visible;
     }
 
     public static boolean shouldAdd(TileEntityContainerBlock tile) {
-        return tile instanceof IAEUpgradeHost && tile instanceof IUpgradeTile upgradeTile && upgradeTile.supportsUpgrade(AEUpgrade.AE_CRAFTING);
+        return tile instanceof IAEUpgradeHost host && AERecipeConfigType.CRAFTING.isSupportedBy(host);
+    }
+
+    public static boolean shouldAdd(TileEntityContainerBlock tile, AERecipeConfigType type) {
+        return tile instanceof IAEUpgradeHost host && type.isSupportedBy(host);
     }
 
     public static boolean canOpen(TileEntityContainerBlock tile) {
-        return tile instanceof IAEUpgradeHost && tile instanceof IUpgradeTile upgradeTile && upgradeTile.isUpgradeInstalled(AEUpgrade.AE_CRAFTING);
+        return canOpen(tile, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean canOpen(TileEntityContainerBlock tile, AERecipeConfigType type) {
+        return tile instanceof IAEUpgradeHost host && type.isInstalledIn(host);
     }
 
     @Override
     public void tick() {
         super.tick();
-        boolean shouldShow = canOpen(dataSource);
+        boolean shouldShow = canOpen(dataSource, configType);
         visible = shouldShow;
         active = shouldShow && !windowOpen;
     }
 
     @Override
     public void openPinnedWindows() {
-        if (canOpen(dataSource)) {
+        if (canOpen(dataSource, configType)) {
             super.openPinnedWindows();
         }
     }
@@ -68,7 +81,7 @@ public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityCo
         return window -> {
             GuiAERecipeConfigWindowTab tab = getElementSupplier().get();
             tab.windowOpen = false;
-            tab.active = tab.visible && canOpen(tab.dataSource);
+            tab.active = tab.visible && canOpen(tab.dataSource, tab.configType);
         };
     }
 
@@ -89,16 +102,16 @@ public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityCo
 
     @Override
     protected ITextComponent getTooltipText() {
-        return AELang.AE_RECIPE_CONFIG.translate();
+        return configType.getTitle().translate();
     }
 
     @Override
     protected GuiWindow createWindow(SelectedWindowData windowData) {
-        return new GuiAERecipeConfigWindow(gui(), (getGuiWidth() - GuiAERecipeConfigWindow.WIDTH) / 2, 18, dataSource, windowData);
+        return new GuiAERecipeConfigWindow(gui(), (getGuiWidth() - GuiAERecipeConfigWindow.WIDTH) / 2, 18, dataSource, windowData, configType);
     }
 
     @Override
     protected SelectedWindowData getNextWindowData() {
-        return WINDOW_DATA;
+        return new SelectedWindowData(configType.getWindowType());
     }
 }

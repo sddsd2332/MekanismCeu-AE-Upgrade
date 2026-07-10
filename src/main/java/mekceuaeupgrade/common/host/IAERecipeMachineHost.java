@@ -7,6 +7,7 @@ import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import net.minecraft.item.ItemStack;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface IAERecipeMachineHost extends IAEItemRecipeHost {
 
@@ -45,6 +46,11 @@ public interface IAERecipeMachineHost extends IAEItemRecipeHost {
     @Override
     default boolean canAcceptAnyAEItemInput() {
         return getAERecipeMachineAdapter().canAcceptAnyItemInput(this);
+    }
+
+    @Override
+    default void observeAEInputContainers(Consumer<Object> observer) {
+        getAERecipeMachineAdapter().observeInputContainers(this, observer);
     }
 
     @Override

@@ -38,7 +38,8 @@ public class AERecipeProfile {
     private static final String ROUTE_KEY = "routeKey";
     private static final String AMOUNT = "amount";
 
-    private RouteFilterMode routeFilterMode = RouteFilterMode.BLACKLIST;
+    private final RouteFilterMode defaultRouteFilterMode;
+    private RouteFilterMode routeFilterMode;
     private final Set<String> enabledRoutes = new LinkedHashSet<>();
     private final Set<String> disabledRoutes = new LinkedHashSet<>();
     private final Map<String, List<String>> orderedRoutes = new LinkedHashMap<>();
@@ -47,12 +48,21 @@ public class AERecipeProfile {
     private int craftAmount = DEFAULT_CRAFT_AMOUNT;
     private int version;
 
+    public AERecipeProfile() {
+        this(RouteFilterMode.BLACKLIST);
+    }
+
+    public AERecipeProfile(RouteFilterMode defaultRouteFilterMode) {
+        this.defaultRouteFilterMode = defaultRouteFilterMode == null ? RouteFilterMode.BLACKLIST : defaultRouteFilterMode;
+        routeFilterMode = this.defaultRouteFilterMode;
+    }
+
     public int getVersion() {
         return version;
     }
 
     public boolean isEmpty() {
-        return routeFilterMode == RouteFilterMode.BLACKLIST && enabledRoutes.isEmpty() && disabledRoutes.isEmpty() && orderedRoutes.isEmpty() &&
+        return routeFilterMode == defaultRouteFilterMode && enabledRoutes.isEmpty() && disabledRoutes.isEmpty() && orderedRoutes.isEmpty() &&
                orderedOutputs.isEmpty() && routeCraftAmounts.isEmpty() && craftAmount == DEFAULT_CRAFT_AMOUNT;
     }
 
@@ -592,7 +602,7 @@ public class AERecipeProfile {
     }
 
     public void readFromNBT(NBTTagCompound tag) {
-        routeFilterMode = RouteFilterMode.fromName(tag.getString(ROUTE_FILTER_MODE));
+        routeFilterMode = tag.hasKey(ROUTE_FILTER_MODE, NBT.TAG_STRING) ? RouteFilterMode.fromName(tag.getString(ROUTE_FILTER_MODE)) : defaultRouteFilterMode;
         enabledRoutes.clear();
         disabledRoutes.clear();
         orderedRoutes.clear();
@@ -645,7 +655,7 @@ public class AERecipeProfile {
     }
 
     public AERecipeProfile copy() {
-        AERecipeProfile copy = new AERecipeProfile();
+        AERecipeProfile copy = new AERecipeProfile(defaultRouteFilterMode);
         copy.routeFilterMode = routeFilterMode;
         copy.craftAmount = craftAmount;
         copy.enabledRoutes.addAll(enabledRoutes);
@@ -684,7 +694,11 @@ public class AERecipeProfile {
     }
 
     public static AERecipeProfile read(NBTTagCompound tag) {
-        AERecipeProfile profile = new AERecipeProfile();
+        return read(tag, RouteFilterMode.BLACKLIST);
+    }
+
+    public static AERecipeProfile read(NBTTagCompound tag, RouteFilterMode defaultRouteFilterMode) {
+        AERecipeProfile profile = new AERecipeProfile(defaultRouteFilterMode);
         profile.readFromNBT(tag);
         return profile;
     }

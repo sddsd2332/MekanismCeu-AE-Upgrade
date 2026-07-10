@@ -45,6 +45,11 @@ import java.util.WeakHashMap;
 public final class AERecipeProfileManager {
 
     public static final String CONFIG_CARD_TAG = "aeRecipeProfile";
+    public static final String CONFIG_CARD_AUTO_PROCESSING_TAG = "aeAutoProcessingRecipeProfile";
+    private static final String CONFIG_CARD_PROFILE_INDIVIDUAL_TAG = "aeRecipeProfileUseIndividual";
+    private static final String CONFIG_CARD_PROFILE_GLOBAL_SLOT_TAG = "aeRecipeProfileGlobalSlot";
+    private static final String CONFIG_CARD_AUTO_PROCESSING_PROFILE_INDIVIDUAL_TAG = "aeAutoProcessingRecipeProfileUseIndividual";
+    private static final String CONFIG_CARD_AUTO_PROCESSING_PROFILE_GLOBAL_SLOT_TAG = "aeAutoProcessingRecipeProfileGlobalSlot";
 
     private static final Map<ProfileIdentity, AERecipeProfile> profiles = new HashMap<>();
     private static final Set<IAEUpgradeHost> activeHosts = Collections.newSetFromMap(new WeakHashMap<>());
@@ -54,15 +59,25 @@ public final class AERecipeProfileManager {
 
     @Nullable
     public static AERecipeProfile getProfile(IAEUpgradeHost host) {
+        return getProfile(host, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    public static AERecipeProfile getProfile(IAEUpgradeHost host, AERecipeConfigType type) {
         if (!(host instanceof TileEntity tile)) {
             return null;
         }
-        return getProfile(tile, null, false);
+        return getProfile(tile, null, false, type);
     }
 
     @Nullable
     public static AERecipeProfile getOrCreateProfile(TileEntity tile, @Nullable EntityPlayer player) {
-        return getProfile(tile, player, true);
+        return getOrCreateProfile(tile, player, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    public static AERecipeProfile getOrCreateProfile(TileEntity tile, @Nullable EntityPlayer player, AERecipeConfigType type) {
+        return getProfile(tile, player, true, type);
     }
 
     public static void ensureProfileOwner(TileEntity tile, @Nullable EntityPlayer player) {
@@ -83,20 +98,35 @@ public final class AERecipeProfileManager {
 
     @Nullable
     private static AERecipeProfile getProfile(TileEntity tile, @Nullable EntityPlayer player, boolean create) {
-        ProfileIdentity identity = resolveIdentity(tile, player);
-        return getProfile(identity, create);
+        return getProfile(tile, player, create, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    private static AERecipeProfile getProfile(TileEntity tile, @Nullable EntityPlayer player, boolean create, AERecipeConfigType type) {
+        ProfileIdentity identity = resolveIdentity(tile, player, type);
+        return getProfile(identity, create, type);
     }
 
     @Nullable
     private static AERecipeProfile getProfile(TileEntity tile, @Nullable EntityPlayer player, boolean create, boolean individual) {
-        ProfileIdentity identity = resolveIdentity(tile, player, individual);
-        return getProfile(identity, create);
+        return getProfile(tile, player, create, individual, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    private static AERecipeProfile getProfile(TileEntity tile, @Nullable EntityPlayer player, boolean create, boolean individual, AERecipeConfigType type) {
+        ProfileIdentity identity = resolveIdentity(tile, player, individual, type);
+        return getProfile(identity, create, type);
     }
 
     @Nullable
     private static AERecipeProfile getProfile(@Nullable ProfileIdentity identity, boolean create) {
+        return getProfile(identity, create, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    private static AERecipeProfile getProfile(@Nullable ProfileIdentity identity, boolean create, AERecipeConfigType type) {
         if (identity == null) {
-            return create ? new AERecipeProfile() : null;
+            return create ? new AERecipeProfile(type.getDefaultFilterMode()) : null;
         }
         AERecipeProfile profile = profiles.get(identity);
         if (profile == null) {
@@ -107,21 +137,31 @@ public final class AERecipeProfileManager {
     }
 
     public static AERecipeConfigSnapshot buildSnapshot(IAEUpgradeHost host, @Nullable EntityPlayer viewer) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return buildSnapshot(host, viewer, AERecipeConfigType.CRAFTING);
+    }
+
+    public static AERecipeConfigSnapshot buildSnapshot(IAEUpgradeHost host, @Nullable EntityPlayer viewer, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return AERecipeConfigSnapshot.EMPTY;
         }
-        List<AEExposedRecipe> defaultRecipes = AEUpgradeRecipeCache.collectExposableRecipes(host);
-        if (defaultRecipes.isEmpty()) {
+        List<AEExposedRecipe> configurableRecipes = AEUpgradeRecipeCache.collectConfigurableRecipes(host);
+        if (configurableRecipes.isEmpty()) {
             return AERecipeConfigSnapshot.EMPTY;
         }
-        defaultRecipes.sort(Comparator.comparing(recipe -> recipe.getOutputStack().getDisplayName()));
-        AERecipeProfile profile = getOrCreateProfile(tile, viewer);
-        if (profile != null && profile.prune(defaultRecipes)) {
-            save(tile, viewer, profile, false);
+        configurableRecipes.sort(Comparator.comparing(recipe -> recipe.getOutputStack().getDisplayName()));
+        List<AEExposedRecipe> profileRecipes = new ArrayList<>();
+        for (AEExposedRecipe recipe : configurableRecipes) {
+            if (type.allowsSelfReferentialRoutes() || recipe.isExposableToCrafting()) {
+                profileRecipes.add(recipe);
+            }
+        }
+        AERecipeProfile profile = getOrCreateProfile(tile, viewer, type);
+        if (profile != null && profile.prune(profileRecipes)) {
+            save(tile, viewer, profile, false, type);
         }
         int craftAmount = profile == null ? AERecipeProfile.DEFAULT_CRAFT_AMOUNT : profile.getCraftAmount();
         Map<String, List<AEExposedRecipe>> grouped = new LinkedHashMap<>();
-        for (AEExposedRecipe recipe : defaultRecipes) {
+        for (AEExposedRecipe recipe : configurableRecipes) {
             grouped.computeIfAbsent(recipe.getRecipeKey().getOutputKey(), key -> new ArrayList<>()).add(recipe);
         }
         List<String> defaultProductOrder = new ArrayList<>(grouped.keySet());
@@ -141,14 +181,16 @@ public final class AERecipeProfileManager {
             List<AERecipeConfigSnapshot.Route> routes = new ArrayList<>();
             int order = 0;
             for (AEExposedRecipe recipe : group) {
+                boolean modifiable = type.allowsSelfReferentialRoutes() || recipe.isExposableToCrafting();
                 routes.add(new AERecipeConfigSnapshot.Route(
                       recipe.getRecipeKey().getRouteKey(),
                       recipe.getInputStacks(),
                       recipe.getOutputStacks(),
-                      profile == null || profile.isRouteEnabled(recipe),
+                      modifiable && (profile == null ? type.areRoutesEnabledByDefault() : profile.isRouteEnabled(recipe)),
                       order++,
-                      profile == null ? AERecipeProfile.DEFAULT_CRAFT_AMOUNT : profile.getEffectiveCraftAmount(recipe),
-                      profile != null && profile.hasRouteCraftAmount(recipe.getRecipeKey().getRouteKey())
+                      modifiable && profile != null ? profile.getEffectiveCraftAmount(recipe) : AERecipeProfile.DEFAULT_CRAFT_AMOUNT,
+                      modifiable && profile != null && profile.hasRouteCraftAmount(recipe.getRecipeKey().getRouteKey()),
+                      modifiable
                 ));
             }
             products.add(new AERecipeConfigSnapshot.Product(
@@ -158,30 +200,34 @@ public final class AERecipeProfileManager {
                   routes
             ));
         }
-        return new AERecipeConfigSnapshot(products, host.getAEUpgradeNode().isRecipeProfileIndividual(),
-              host.getAEUpgradeNode().getRecipeProfileGlobalSlot(), craftAmount,
-              profile == null ? AERecipeProfile.RouteFilterMode.BLACKLIST : profile.getRouteFilterMode());
+        return new AERecipeConfigSnapshot(products, host.getAEUpgradeNode().isRecipeProfileIndividual(type),
+              host.getAEUpgradeNode().getRecipeProfileGlobalSlot(type), craftAmount,
+              profile == null ? type.getDefaultFilterMode() : profile.getRouteFilterMode());
     }
 
     public static boolean toggleProfileMode(IAEUpgradeHost host, EntityPlayer player) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return toggleProfileMode(host, player, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean toggleProfileMode(IAEUpgradeHost host, EntityPlayer player, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        boolean individual = !host.getAEUpgradeNode().isRecipeProfileIndividual();
-        boolean changed = host.getAEUpgradeNode().setRecipeProfileIndividual(individual);
-        if (individual && !host.getAEUpgradeNode().isRecipeProfileIndividualInitialized()) {
-            AERecipeProfile globalProfile = getProfile(tile, player, true, false);
-            AERecipeProfile individualProfile = getProfile(tile, player, true, true);
+        boolean individual = !host.getAEUpgradeNode().isRecipeProfileIndividual(type);
+        boolean changed = host.getAEUpgradeNode().setRecipeProfileIndividual(type, individual);
+        if (individual && !host.getAEUpgradeNode().isRecipeProfileIndividualInitialized(type)) {
+            AERecipeProfile globalProfile = getProfile(tile, player, true, false, type);
+            AERecipeProfile individualProfile = getProfile(tile, player, true, true, type);
             if (individualProfile != null) {
-                AERecipeProfile copy = globalProfile == null ? new AERecipeProfile() : globalProfile.copy();
-                host.getAEUpgradeNode().markRecipeProfileIndividualInitialized();
+                AERecipeProfile copy = globalProfile == null ? new AERecipeProfile(type.getDefaultFilterMode()) : globalProfile.copy();
+                host.getAEUpgradeNode().markRecipeProfileIndividualInitialized(type);
                 if (individualProfile.replaceWith(copy)) {
-                    save(tile, player, individualProfile);
+                    save(tile, player, individualProfile, type);
                     return true;
                 }
             }
         }
-        ProfileIdentity identity = resolveIdentity(tile, player);
+        ProfileIdentity identity = resolveIdentity(tile, player, type);
         if (identity != null) {
             notifyProfileChanged(identity);
         }
@@ -189,16 +235,20 @@ public final class AERecipeProfileManager {
     }
 
     public static boolean cycleGlobalProfileSlot(IAEUpgradeHost host, EntityPlayer player) {
-        return cycleGlobalProfileSlot(host, player, 1);
+        return cycleGlobalProfileSlot(host, player, 1, AERecipeConfigType.CRAFTING);
     }
 
     public static boolean cycleGlobalProfileSlot(IAEUpgradeHost host, EntityPlayer player, int direction) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile) || host.getAEUpgradeNode().isRecipeProfileIndividual()) {
+        return cycleGlobalProfileSlot(host, player, direction, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean cycleGlobalProfileSlot(IAEUpgradeHost host, EntityPlayer player, int direction, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile) || host.getAEUpgradeNode().isRecipeProfileIndividual(type)) {
             return false;
         }
-        boolean changed = host.getAEUpgradeNode().cycleRecipeProfileGlobalSlot(direction);
+        boolean changed = host.getAEUpgradeNode().cycleRecipeProfileGlobalSlot(type, direction);
         if (changed) {
-            ProfileIdentity identity = resolveIdentity(tile, player, false);
+            ProfileIdentity identity = resolveIdentity(tile, player, false, type);
             if (identity != null) {
                 notifyProfileChanged(identity);
             }
@@ -207,67 +257,83 @@ public final class AERecipeProfileManager {
     }
 
     public static boolean toggleRouteFilterMode(IAEUpgradeHost host, EntityPlayer player) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return toggleRouteFilterMode(host, player, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean toggleRouteFilterMode(IAEUpgradeHost host, EntityPlayer player, AERecipeConfigType type) {
+        if (!type.isRouteFilterMutable() || !canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.toggleRouteFilterMode();
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean toggleRoute(IAEUpgradeHost host, EntityPlayer player, String routeKey) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return toggleRoute(host, player, routeKey, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean toggleRoute(IAEUpgradeHost host, EntityPlayer player, String routeKey, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        if (!hasRoute(host, routeKey)) {
+        if (!hasRoute(host, routeKey, type)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean enabled = profile.isRouteEnabled(routeKey);
         boolean changed = profile.setRouteEnabled(routeKey, !enabled);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean setAllRoutesEnabled(IAEUpgradeHost host, EntityPlayer player, boolean enabled) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return setAllRoutesEnabled(host, player, enabled, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean setAllRoutesEnabled(IAEUpgradeHost host, EntityPlayer player, boolean enabled, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getAllRouteKeys(host);
+        List<String> defaultOrder = getAllRouteKeys(host, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.setRoutesEnabled(defaultOrder, enabled);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean toggleProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return toggleProduct(host, player, outputKey, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean toggleProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey);
+        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
@@ -280,205 +346,245 @@ public final class AERecipeProfileManager {
         }
         boolean changed = profile.setRoutesEnabled(defaultOrder, allDisabled);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean disableProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return disableProduct(host, player, outputKey, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean disableProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey);
+        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.setRoutesEnabled(defaultOrder, false);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean moveProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey, int direction) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return moveProduct(host, player, outputKey, direction, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean moveProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey, int direction, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultProductOrder(host);
+        List<String> defaultOrder = getDefaultProductOrder(host, type);
         if (defaultOrder.isEmpty() || !defaultOrder.contains(outputKey)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.moveProduct(defaultOrder, outputKey, direction);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean moveProductToEdge(IAEUpgradeHost host, EntityPlayer player, String outputKey, boolean top) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return moveProductToEdge(host, player, outputKey, top, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean moveProductToEdge(IAEUpgradeHost host, EntityPlayer player, String outputKey, boolean top, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultProductOrder(host);
+        List<String> defaultOrder = getDefaultProductOrder(host, type);
         if (defaultOrder.isEmpty() || !defaultOrder.contains(outputKey)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.moveProductToEdge(defaultOrder, outputKey, top);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean moveRoute(IAEUpgradeHost host, EntityPlayer player, String outputKey, String routeKey, int direction) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return moveRoute(host, player, outputKey, routeKey, direction, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean moveRoute(IAEUpgradeHost host, EntityPlayer player, String outputKey, String routeKey, int direction, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey);
+        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.moveRoute(outputKey, defaultOrder, routeKey, direction);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean moveRouteToEdge(IAEUpgradeHost host, EntityPlayer player, String outputKey, String routeKey, boolean top) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return moveRouteToEdge(host, player, outputKey, routeKey, top, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean moveRouteToEdge(IAEUpgradeHost host, EntityPlayer player, String outputKey, String routeKey, boolean top, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey);
+        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.moveRouteToEdge(outputKey, defaultOrder, routeKey, top);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean setGlobalCraftAmount(IAEUpgradeHost host, EntityPlayer player, int amount) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return setGlobalCraftAmount(host, player, amount, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean setGlobalCraftAmount(IAEUpgradeHost host, EntityPlayer player, int amount, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<AEExposedRecipe> defaultRecipes = AEUpgradeRecipeCache.collectExposableRecipes(host);
+        List<AEExposedRecipe> defaultRecipes = collectProfileRecipes(host, type);
         if (defaultRecipes.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.prune(defaultRecipes);
         changed |= profile.setCraftAmount(amount, AERecipeProfile.getMaxCraftAmount(defaultRecipes));
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean setRouteCraftAmount(IAEUpgradeHost host, EntityPlayer player, String routeKey, int amount) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return setRouteCraftAmount(host, player, routeKey, amount, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean setRouteCraftAmount(IAEUpgradeHost host, EntityPlayer player, String routeKey, int amount, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<AEExposedRecipe> defaultRecipes = AEUpgradeRecipeCache.collectExposableRecipes(host);
+        List<AEExposedRecipe> defaultRecipes = collectProfileRecipes(host, type);
         AEExposedRecipe route = findRoute(defaultRecipes, routeKey);
         if (route == null) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.prune(defaultRecipes);
         changed |= profile.setRouteCraftAmount(routeKey, amount, route.getMaxCraftAmount());
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean clearRouteCraftAmount(IAEUpgradeHost host, EntityPlayer player, String routeKey) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return clearRouteCraftAmount(host, player, routeKey, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean clearRouteCraftAmount(IAEUpgradeHost host, EntityPlayer player, String routeKey, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        if (!hasRoute(host, routeKey)) {
+        if (!hasRoute(host, routeKey, type)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.clearRouteCraftAmount(routeKey);
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean resetProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return resetProduct(host, player, outputKey, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean resetProduct(IAEUpgradeHost host, EntityPlayer player, String outputKey, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey);
+        List<String> defaultOrder = getDefaultRouteOrder(host, outputKey, type);
         if (defaultOrder.isEmpty()) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.resetProduct(outputKey, defaultOrder);
-        List<String> defaultProductOrder = getDefaultProductOrder(host);
+        List<String> defaultProductOrder = getDefaultProductOrder(host, type);
         if (!defaultProductOrder.isEmpty()) {
             changed |= profile.resetProductOrder(outputKey, defaultProductOrder);
         }
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
     public static boolean resetAll(IAEUpgradeHost host, EntityPlayer player) {
-        if (!canConfigure(host) || !(host instanceof TileEntity tile)) {
+        return resetAll(host, player, AERecipeConfigType.CRAFTING);
+    }
+
+    public static boolean resetAll(IAEUpgradeHost host, EntityPlayer player, AERecipeConfigType type) {
+        if (!canConfigure(host, type) || !(host instanceof TileEntity tile)) {
             return false;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, player);
+        AERecipeProfile profile = getOrCreateProfile(tile, player, type);
         if (profile == null) {
             return false;
         }
         boolean changed = profile.resetAll();
         if (changed) {
-            save(tile, player, profile);
+            save(tile, player, profile, type);
         }
         return changed;
     }
 
-    private static boolean hasRoute(IAEUpgradeHost host, String routeKey) {
-        return findRoute(AEUpgradeRecipeCache.collectExposableRecipes(host), routeKey) != null;
+    private static boolean hasRoute(IAEUpgradeHost host, String routeKey, AERecipeConfigType type) {
+        return findRoute(collectProfileRecipes(host, type), routeKey) != null;
     }
 
     @Nullable
@@ -492,15 +598,31 @@ public final class AERecipeProfileManager {
     }
 
     private static boolean canConfigure(IAEUpgradeHost host) {
-        return host.hasAEUpgrade() && host instanceof IAEItemRecipeHost;
+        return canConfigure(host, AERecipeConfigType.CRAFTING);
+    }
+
+    private static boolean canConfigure(IAEUpgradeHost host, AERecipeConfigType type) {
+        return host != null && type.isInstalledIn(host) && host instanceof IAEItemRecipeHost;
     }
 
     public static NBTTagCompound writeConfigCardData(TileEntity tile, NBTTagCompound nbtTags) {
-        AERecipeProfile profile = getProfile(tile, null, false);
-        if (profile != null && !profile.isEmpty()) {
-            nbtTags.setTag(CONFIG_CARD_TAG, profile.writeToNBT(new NBTTagCompound()));
-        }
+        writeConfigCardData(tile, nbtTags, AERecipeConfigType.CRAFTING);
+        writeConfigCardData(tile, nbtTags, AERecipeConfigType.AUTO_PROCESSING);
         return nbtTags;
+    }
+
+    private static void writeConfigCardData(TileEntity tile, NBTTagCompound nbtTags, AERecipeConfigType type) {
+        if (!canUseConfigCardProfile(tile, type)) {
+            return;
+        }
+        IAEUpgradeHost host = (IAEUpgradeHost) tile;
+        nbtTags.setBoolean(getConfigCardIndividualTag(type), host.getAEUpgradeNode().isRecipeProfileIndividual(type));
+        nbtTags.setInteger(getConfigCardGlobalSlotTag(type), host.getAEUpgradeNode().getRecipeProfileGlobalSlot(type));
+        nbtTags.removeTag(getConfigCardTag(type));
+        AERecipeProfile profile = getProfile(tile, null, false, type);
+        if (profile != null && !profile.isEmpty()) {
+            nbtTags.setTag(getConfigCardTag(type), profile.writeToNBT(new NBTTagCompound()));
+        }
     }
 
     public static void clearWorld(World world) {
@@ -513,22 +635,74 @@ public final class AERecipeProfileManager {
     }
 
     public static void readConfigCardData(TileEntity tile, NBTTagCompound nbtTags) {
-        if (!(tile instanceof IAEUpgradeHost host)) {
+        if (!(tile instanceof IAEUpgradeHost)) {
             return;
         }
-        AERecipeProfile profile = getOrCreateProfile(tile, null);
+        readConfigCardData(tile, nbtTags, AERecipeConfigType.CRAFTING);
+        readConfigCardData(tile, nbtTags, AERecipeConfigType.AUTO_PROCESSING);
+    }
+
+    private static void readConfigCardData(TileEntity tile, NBTTagCompound nbtTags, AERecipeConfigType type) {
+        if (!canUseConfigCardProfile(tile, type) || !hasConfigCardProfileData(nbtTags, type)) {
+            return;
+        }
+        boolean modeChanged = applyConfigCardProfileMode(tile, nbtTags, type);
+        AERecipeProfile profile = getOrCreateProfile(tile, null, type);
         if (profile == null) {
             return;
         }
-        AERecipeProfile incoming = nbtTags.hasKey(CONFIG_CARD_TAG) ? AERecipeProfile.read(nbtTags.getCompoundTag(CONFIG_CARD_TAG)) : new AERecipeProfile();
-        if (profile.replaceWith(incoming)) {
-            save(tile, null, profile);
+        String tag = getConfigCardTag(type);
+        AERecipeProfile incoming = nbtTags.hasKey(tag) ? AERecipeProfile.read(nbtTags.getCompoundTag(tag), type.getDefaultFilterMode()) :
+              new AERecipeProfile(type.getDefaultFilterMode());
+        if (profile.replaceWith(incoming) || modeChanged) {
+            save(tile, null, profile, type);
         }
     }
 
-    private static List<String> getDefaultRouteOrder(IAEUpgradeHost host, String outputKey) {
+    private static boolean canUseConfigCardProfile(TileEntity tile, AERecipeConfigType type) {
+        return tile instanceof IAEUpgradeHost host && host instanceof IAEItemRecipeHost && type.isSupportedBy(host);
+    }
+
+    private static boolean hasConfigCardProfileData(NBTTagCompound nbtTags, AERecipeConfigType type) {
+        return nbtTags.hasKey(getConfigCardTag(type)) || nbtTags.hasKey(getConfigCardIndividualTag(type)) || nbtTags.hasKey(getConfigCardGlobalSlotTag(type));
+    }
+
+    private static boolean applyConfigCardProfileMode(TileEntity tile, NBTTagCompound nbtTags, AERecipeConfigType type) {
+        if (!(tile instanceof IAEUpgradeHost host) || !nbtTags.hasKey(getConfigCardIndividualTag(type))) {
+            return false;
+        }
+        boolean changed = false;
+        boolean individual = nbtTags.getBoolean(getConfigCardIndividualTag(type));
+        if (individual) {
+            changed |= host.getAEUpgradeNode().setRecipeProfileIndividual(type, true);
+            if (!host.getAEUpgradeNode().isRecipeProfileIndividualInitialized(type)) {
+                host.getAEUpgradeNode().markRecipeProfileIndividualInitialized(type);
+                changed = true;
+            }
+        } else {
+            changed |= host.getAEUpgradeNode().setRecipeProfileIndividual(type, false);
+            if (nbtTags.hasKey(getConfigCardGlobalSlotTag(type))) {
+                changed |= host.getAEUpgradeNode().setRecipeProfileGlobalSlot(type, nbtTags.getInteger(getConfigCardGlobalSlotTag(type)));
+            }
+        }
+        return changed;
+    }
+
+    private static String getConfigCardTag(AERecipeConfigType type) {
+        return type == AERecipeConfigType.AUTO_PROCESSING ? CONFIG_CARD_AUTO_PROCESSING_TAG : CONFIG_CARD_TAG;
+    }
+
+    private static String getConfigCardIndividualTag(AERecipeConfigType type) {
+        return type == AERecipeConfigType.AUTO_PROCESSING ? CONFIG_CARD_AUTO_PROCESSING_PROFILE_INDIVIDUAL_TAG : CONFIG_CARD_PROFILE_INDIVIDUAL_TAG;
+    }
+
+    private static String getConfigCardGlobalSlotTag(AERecipeConfigType type) {
+        return type == AERecipeConfigType.AUTO_PROCESSING ? CONFIG_CARD_AUTO_PROCESSING_PROFILE_GLOBAL_SLOT_TAG : CONFIG_CARD_PROFILE_GLOBAL_SLOT_TAG;
+    }
+
+    private static List<String> getDefaultRouteOrder(IAEUpgradeHost host, String outputKey, AERecipeConfigType type) {
         List<String> routeKeys = new ArrayList<>();
-        for (AEExposedRecipe recipe : AEUpgradeRecipeCache.collectExposableRecipes(host)) {
+        for (AEExposedRecipe recipe : collectProfileRecipes(host, type)) {
             if (recipe.getRecipeKey().getOutputKey().equals(outputKey)) {
                 routeKeys.add(recipe.getRecipeKey().getRouteKey());
             }
@@ -536,9 +710,9 @@ public final class AERecipeProfileManager {
         return routeKeys;
     }
 
-    private static List<String> getAllRouteKeys(IAEUpgradeHost host) {
+    private static List<String> getAllRouteKeys(IAEUpgradeHost host, AERecipeConfigType type) {
         List<String> routeKeys = new ArrayList<>();
-        for (AEExposedRecipe recipe : AEUpgradeRecipeCache.collectExposableRecipes(host)) {
+        for (AEExposedRecipe recipe : collectProfileRecipes(host, type)) {
             String routeKey = recipe.getRecipeKey().getRouteKey();
             if (!routeKeys.contains(routeKey)) {
                 routeKeys.add(routeKey);
@@ -547,8 +721,8 @@ public final class AERecipeProfileManager {
         return routeKeys;
     }
 
-    private static List<String> getDefaultProductOrder(IAEUpgradeHost host) {
-        List<AEExposedRecipe> recipes = AEUpgradeRecipeCache.collectExposableRecipes(host);
+    private static List<String> getDefaultProductOrder(IAEUpgradeHost host, AERecipeConfigType type) {
+        List<AEExposedRecipe> recipes = collectProfileRecipes(host, type);
         recipes.sort(Comparator.comparing(recipe -> recipe.getOutputStack().getDisplayName()));
         List<String> outputKeys = new ArrayList<>();
         for (AEExposedRecipe recipe : recipes) {
@@ -560,8 +734,13 @@ public final class AERecipeProfileManager {
         return outputKeys;
     }
 
+    private static List<AEExposedRecipe> collectProfileRecipes(IAEUpgradeHost host, AERecipeConfigType type) {
+        return type.allowsSelfReferentialRoutes() ? AEUpgradeRecipeCache.collectConfigurableRecipes(host) :
+              AEUpgradeRecipeCache.collectCraftingRecipes(host);
+    }
+
     private static AERecipeProfile load(ProfileIdentity identity) {
-        AERecipeProfile profile = new AERecipeProfile();
+        AERecipeProfile profile = new AERecipeProfile(identity.type().getDefaultFilterMode());
         File file = identity.file();
         if (!file.isFile()) {
             return profile;
@@ -575,11 +754,19 @@ public final class AERecipeProfileManager {
     }
 
     private static void save(TileEntity tile, @Nullable EntityPlayer player, AERecipeProfile profile) {
-        save(tile, player, profile, true);
+        save(tile, player, profile, true, AERecipeConfigType.CRAFTING);
     }
 
     private static void save(TileEntity tile, @Nullable EntityPlayer player, AERecipeProfile profile, boolean notify) {
-        ProfileIdentity identity = resolveIdentity(tile, player);
+        save(tile, player, profile, notify, AERecipeConfigType.CRAFTING);
+    }
+
+    private static void save(TileEntity tile, @Nullable EntityPlayer player, AERecipeProfile profile, AERecipeConfigType type) {
+        save(tile, player, profile, true, type);
+    }
+
+    private static void save(TileEntity tile, @Nullable EntityPlayer player, AERecipeProfile profile, boolean notify, AERecipeConfigType type) {
+        ProfileIdentity identity = resolveIdentity(tile, player, type);
         if (identity == null) {
             return;
         }
@@ -618,34 +805,44 @@ public final class AERecipeProfileManager {
                 activeHosts.remove(host);
                 continue;
             }
-            ProfileIdentity hostIdentity = resolveIdentity(tile, null);
+            ProfileIdentity hostIdentity = resolveIdentity(tile, null, identity.type());
             if (identity.equals(hostIdentity)) {
                 host.getAEUpgradeNode().invalidateRecipeCache();
-                syncOpenConfigWindows(host, tile);
+                syncOpenConfigWindows(host, tile, identity.type());
             }
         }
     }
 
-    private static void syncOpenConfigWindows(IAEUpgradeHost host, TileEntity tile) {
+    private static void syncOpenConfigWindows(IAEUpgradeHost host, TileEntity tile, AERecipeConfigType type) {
         if (!(tile instanceof TileEntityBasicBlock basic) || basic.playersUsing.isEmpty()) {
             return;
         }
         for (EntityPlayer user : basic.playersUsing) {
             if (user instanceof EntityPlayerMP userMP && PacketHandler.canAccessTile(user, tile, true)) {
-                AERecipeConfigSnapshot snapshot = buildSnapshot(host, user);
-                MEKCeuAEUpgrade.packetHandler.sendTo(AERecipeConfigMessage.snapshot(Coord4D.get(tile), snapshot), userMP);
+                AERecipeConfigSnapshot snapshot = buildSnapshot(host, user, type);
+                MEKCeuAEUpgrade.packetHandler.sendTo(AERecipeConfigMessage.snapshot(Coord4D.get(tile), snapshot, type), userMP);
             }
         }
     }
 
     @Nullable
     private static ProfileIdentity resolveIdentity(TileEntity tile, @Nullable EntityPlayer player) {
-        boolean individual = tile instanceof IAEUpgradeHost host && host.getAEUpgradeNode().isRecipeProfileIndividual();
-        return resolveIdentity(tile, player, individual);
+        return resolveIdentity(tile, player, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    private static ProfileIdentity resolveIdentity(TileEntity tile, @Nullable EntityPlayer player, AERecipeConfigType type) {
+        boolean individual = tile instanceof IAEUpgradeHost host && host.getAEUpgradeNode().isRecipeProfileIndividual(type);
+        return resolveIdentity(tile, player, individual, type);
     }
 
     @Nullable
     private static ProfileIdentity resolveIdentity(TileEntity tile, @Nullable EntityPlayer player, boolean individual) {
+        return resolveIdentity(tile, player, individual, AERecipeConfigType.CRAFTING);
+    }
+
+    @Nullable
+    private static ProfileIdentity resolveIdentity(TileEntity tile, @Nullable EntityPlayer player, boolean individual, AERecipeConfigType type) {
         World world = tile.getWorld();
         if (world == null || world.isRemote || world.getSaveHandler() == null) {
             return null;
@@ -660,24 +857,35 @@ public final class AERecipeProfileManager {
         String profileId = machineId;
         File directory = ownerDirectory;
         String filePrefix = sanitize(machineId);
+        if (type != AERecipeConfigType.CRAFTING) {
+            profileId = type.getId() + "/" + profileId;
+            directory = new File(ownerDirectory, type.getId());
+            filePrefix = type.getId() + "_" + filePrefix;
+        }
         if (individual) {
             if (!(tile instanceof IAEUpgradeHost host)) {
                 return null;
             }
-            UUID instance = host.getAEUpgradeNode().getOrCreateRecipeProfileInstance();
+            UUID instance = host.getAEUpgradeNode().getOrCreateRecipeProfileInstance(type);
             profileId = machineId + "/" + instance;
-            directory = new File(ownerDirectory, "single");
+            if (type != AERecipeConfigType.CRAFTING) {
+                profileId = type.getId() + "/" + profileId;
+            }
+            directory = type == AERecipeConfigType.CRAFTING ? new File(ownerDirectory, "single") : new File(new File(ownerDirectory, type.getId()), "single");
         } else if (tile instanceof IAEUpgradeHost host) {
             int slot = Math.max(AEUpgradeNode.MIN_GLOBAL_PROFILE_SLOT,
-                  Math.min(AEUpgradeNode.MAX_GLOBAL_PROFILE_SLOT, host.getAEUpgradeNode().getRecipeProfileGlobalSlot()));
+                  Math.min(AEUpgradeNode.MAX_GLOBAL_PROFILE_SLOT, host.getAEUpgradeNode().getRecipeProfileGlobalSlot(type)));
             if (slot > AEUpgradeNode.MIN_GLOBAL_PROFILE_SLOT) {
                 profileId = machineId + "/global/" + slot;
-                directory = new File(ownerDirectory, "global");
+                if (type != AERecipeConfigType.CRAFTING) {
+                    profileId = type.getId() + "/" + profileId;
+                }
+                directory = type == AERecipeConfigType.CRAFTING ? new File(ownerDirectory, "global") : new File(new File(ownerDirectory, type.getId()), "global");
                 filePrefix += "_global_" + slot;
             }
         }
         File file = new File(directory, filePrefix + "_" + digest(profileId) + ".dat");
-        return new ProfileIdentity(worldDirectory.getAbsolutePath(), owner, profileId, individual, file);
+        return new ProfileIdentity(worldDirectory.getAbsolutePath(), owner, profileId, individual, type, file);
     }
 
     @Nullable
@@ -735,6 +943,6 @@ public final class AERecipeProfileManager {
     }
 
     @Desugar
-    private record ProfileIdentity(String worldPath, UUID owner, String profileId, boolean individual, File file) {
+    private record ProfileIdentity(String worldPath, UUID owner, String profileId, boolean individual, AERecipeConfigType type, File file) {
     }
 }

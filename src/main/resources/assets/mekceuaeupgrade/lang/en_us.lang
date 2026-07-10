@@ -3,19 +3,45 @@ itemGroup.tabmekceuaeupgrade=Mekanism CEu: AE Upgrade
 
 # Items
 item.AECraftingUpgrade.name=AE Crafting Upgrade
+item.AEOutputUpgrade.name=AE Output Upgrade
+item.AEAutoProcessingUpgrade.name=AE Auto Processing Upgrade
+item.AEWirelessCraftingUpgrade.name=Wireless AE Crafting Upgrade
+item.AEWirelessAutoProcessingUpgrade.name=Wireless AE Auto Processing Upgrade
+item.AEWirelessOutputUpgrade.name=Wireless AE Output Upgrade
 
 # Upgrades
 upgrade.ae_crafting=AE Crafting
 upgrade.ae_crafting.desc=Allows this machine to expose its recipes as AE crafting patterns and accept AE crafting jobs.
+upgrade.ae_output=AE Output
+upgrade.ae_output.desc=Allows this machine to push its item, gas, and fluid outputs into the connected AE network.
+upgrade.ae_auto_processing=AE Auto Processing
+upgrade.ae_auto_processing.desc=Allows this machine to pull enabled recipe inputs from the connected AE network and process them automatically.
+upgrade.ae_wireless_crafting=Wireless AE Crafting
+upgrade.ae_wireless_crafting.desc=Allows this machine to expose its recipes through the AE network bound by a Security Terminal and accept AE crafting jobs.
+upgrade.ae_wireless_auto_processing=Wireless AE Auto Processing
+upgrade.ae_wireless_auto_processing.desc=Allows this machine to pull enabled recipe inputs from the AE network bound by a Security Terminal and process them automatically.
+upgrade.ae_wireless_output=Wireless AE Output
+upgrade.ae_wireless_output.desc=Allows this machine to push item, gas, and fluid outputs into the AE network bound by a Security Terminal.
+
+# Wireless upgrade tooltip
+tooltip.mekceuaeupgrade.wireless_unlinked=Not linked to an AE network
+tooltip.mekceuaeupgrade.wireless_linked=Linked to an AE network
+tooltip.mekceuaeupgrade.wireless_location=Network Location
+tooltip.mekceuaeupgrade.wireless_location_unavailable=Network location is currently unavailable
+tooltip.mekceuaeupgrade.wireless_cleared=Cleared wireless AE network binding
+tooltip.mekceuaeupgrade.wireless_already_unlinked=This wireless upgrade is not bound to an AE network
+tooltip.mekceuaeupgrade.wireless_install_unlinked=Bind this wireless upgrade in an AE Security Terminal first
 
 # AE recipe config GUI
 gui.mekceuaeupgrade.ae_recipe_config.title=AE Recipe Config
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.title=AE Auto Processing Config
 gui.mekceuaeupgrade.ae_recipe_config.empty=No exposed recipes
 gui.mekceuaeupgrade.ae_recipe_config.no_match=No matching products
 gui.mekceuaeupgrade.ae_recipe_config.products=Products
 gui.mekceuaeupgrade.ae_recipe_config.products_all=All
 gui.mekceuaeupgrade.ae_recipe_config.products_multi=Multi-route
 gui.mekceuaeupgrade.ae_recipe_config.products_single=Single-route
+gui.mekceuaeupgrade.ae_recipe_config.products_self_referential=Same I/O
 gui.mekceuaeupgrade.ae_recipe_config.search=Search
 gui.mekceuaeupgrade.ae_recipe_config.routes=Routes
 gui.mekceuaeupgrade.ae_recipe_config.enable=Enable
@@ -29,6 +55,7 @@ gui.mekceuaeupgrade.ae_recipe_config.amount_inherit=Inherit
 gui.mekceuaeupgrade.ae_recipe_config.route_enabled=Enabled
 gui.mekceuaeupgrade.ae_recipe_config.route_partial=Partially enabled
 gui.mekceuaeupgrade.ae_recipe_config.route_disabled=Disabled
+gui.mekceuaeupgrade.ae_recipe_config.route_self_referential=Input and output share the same resource; this recipe is not added to AE. View only.
 gui.mekceuaeupgrade.ae_recipe_config.profile_global=Global
 gui.mekceuaeupgrade.ae_recipe_config.profile_single=Per Machine
 gui.mekceuaeupgrade.ae_recipe_config.profile_slot=Config %s
@@ -44,7 +71,8 @@ gui.mekceuaeupgrade.ae_recipe_config.move_bottom=Bottom
 gui.mekceuaeupgrade.ae_recipe_config.profile_mode.tooltip=Switch between global and per-machine config. Per-machine config stores settings for this machine only.
 gui.mekceuaeupgrade.ae_recipe_config.profile_slot.tooltip=Switch global config slot 1-10. Left-click next, right-click previous. Hidden while using per-machine config.
 gui.mekceuaeupgrade.ae_recipe_config.filter_mode.tooltip=Switch recipe filter mode. Blacklist exposes every recipe by default; whitelist exposes only enabled recipes.
-gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=Change the left product list filter: all, multi-route, or single-route.
+gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=Change the left product list filter: all, multi-route, single-route, or matching input/output.
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.product_filter.tooltip=Change the left product list filter: all, multi-route, or single-route.
 gui.mekceuaeupgrade.ae_recipe_config.search.tooltip=Filter the left list by product name. Right-click to clear the input.
 gui.mekceuaeupgrade.ae_recipe_config.toggle_button.tooltip=Click: enable or disable the selected route. Hold Ctrl and click: disable every route for the selected product.
 gui.mekceuaeupgrade.ae_recipe_config.move_up_button.tooltip=Click: raise the priority of the selected product or route. Hold Ctrl and click: move it to the top.

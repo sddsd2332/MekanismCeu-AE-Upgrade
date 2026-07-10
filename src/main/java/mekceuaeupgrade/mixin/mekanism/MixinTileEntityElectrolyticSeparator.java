@@ -60,4 +60,5 @@ public abstract class MixinTileEntityElectrolyticSeparator extends TileEntityBas
         }
         return mekceuaeupgrade$aeRecipeAdapter;
     }
+
 }

@@ -1,6 +1,7 @@
 package mekceuaeupgrade.common.recipe.route;
 
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.recipe.AERecipeStacks;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
 
@@ -113,15 +114,48 @@ public record AERecipeRouteStack(
      * @return 可写入 AE pattern 的旧物品栈，无法转换时返回空栈
      */
     public ItemStack toLegacyStack() {
+        return toLegacyStack(1);
+    }
+
+    /**
+     * 将 typed 栈按批量数量转换成 AE 1.12 pattern 可识别的物品栈。
+     *
+     * <p>气体和流体 fake item 的真实数量通常保存在 NBT 中，因此批量化时需要先放大
+     * typed 栈再重新包装，不能只修改 {@link ItemStack#getCount()}。</p>
+     *
+     * @param multiplier 批量倍数
+     * @return 可写入 AE pattern 的旧物品栈，无法转换时返回空栈
+     */
+    public ItemStack toLegacyStack(int multiplier) {
         switch (kind) {
             case ITEM:
-                return copy(itemStack);
+                return AERecipeStacks.scale(itemStack, multiplier);
             case GAS:
-                return hasLegacyStack() ? copy(legacyItemStack) : AEUpgradeFakeGas.packOutput(gasStack);
+                return hasLegacyStack() ? AERecipeStacks.scale(legacyItemStack, multiplier) : AEUpgradeFakeGas.packOutput(scale(gasStack, multiplier));
             case FLUID:
-                return AEUpgradeFakeFluid.packOutput(fluidStack);
+                return AEUpgradeFakeFluid.packOutput(scale(fluidStack, multiplier));
             default:
                 return ItemStack.EMPTY;
+        }
+    }
+
+    /**
+     * @return 该 typed 栈在不溢出的前提下允许的最大批量倍数
+     */
+    public int getMaxCraftAmount() {
+        int max = Integer.MAX_VALUE;
+        switch (kind) {
+            case ITEM:
+                return getMaxCraftAmount(itemStack);
+            case GAS:
+                if (hasLegacyStack()) {
+                    max = Math.min(max, getMaxCraftAmount(legacyItemStack));
+                }
+                return Math.min(max, getMaxCraftAmount(gasStack));
+            case FLUID:
+                return getMaxCraftAmount(fluidStack);
+            default:
+                return max;
         }
     }
 
@@ -134,6 +168,14 @@ public record AERecipeRouteStack(
     }
 
     /**
+     * @param stack 需要检查的物品栈
+     * @return 该物品栈计数不溢出时允许的最大批量倍数
+     */
+    private static int getMaxCraftAmount(ItemStack stack) {
+        return stack == null || stack.isEmpty() || stack.getCount() <= 0 ? Integer.MAX_VALUE : Integer.MAX_VALUE / stack.getCount();
+    }
+
+    /**
      * @param stack 需要复制的气体栈
      * @return 安全副本，空值保持为 null
      */
@@ -143,11 +185,63 @@ public record AERecipeRouteStack(
     }
 
     /**
+     * @param stack 需要放大的气体栈
+     * @param multiplier 批量倍数
+     * @return 放大后的气体栈，溢出或无效时返回 null
+     */
+    @Nullable
+    private static GasStack scale(@Nullable GasStack stack, int multiplier) {
+        if (stack == null || stack.getGas() == null || stack.amount <= 0 || multiplier <= 0) {
+            return null;
+        }
+        long amount = (long) stack.amount * multiplier;
+        if (amount <= 0 || amount > Integer.MAX_VALUE) {
+            return null;
+        }
+        return stack.copy().withAmount((int) amount);
+    }
+
+    /**
+     * @param stack 需要检查的气体栈
+     * @return 该气体数量不溢出时允许的最大批量倍数
+     */
+    private static int getMaxCraftAmount(@Nullable GasStack stack) {
+        return stack == null || stack.getGas() == null || stack.amount <= 0 ? Integer.MAX_VALUE : Integer.MAX_VALUE / stack.amount;
+    }
+
+    /**
      * @param stack 需要复制的流体栈
      * @return 安全副本，空值保持为 null
      */
     @Nullable
     private static FluidStack copy(@Nullable FluidStack stack) {
         return stack == null ? null : stack.copy();
+    }
+
+    /**
+     * @param stack 需要放大的流体栈
+     * @param multiplier 批量倍数
+     * @return 放大后的流体栈，溢出或无效时返回 null
+     */
+    @Nullable
+    private static FluidStack scale(@Nullable FluidStack stack, int multiplier) {
+        if (stack == null || stack.getFluid() == null || stack.amount <= 0 || multiplier <= 0) {
+            return null;
+        }
+        long amount = (long) stack.amount * multiplier;
+        if (amount <= 0 || amount > Integer.MAX_VALUE) {
+            return null;
+        }
+        FluidStack scaled = stack.copy();
+        scaled.amount = (int) amount;
+        return scaled;
+    }
+
+    /**
+     * @param stack 需要检查的流体栈
+     * @return 该流体数量不溢出时允许的最大批量倍数
+     */
+    private static int getMaxCraftAmount(@Nullable FluidStack stack) {
+        return stack == null || stack.getFluid() == null || stack.amount <= 0 ? Integer.MAX_VALUE : Integer.MAX_VALUE / stack.amount;
     }
 }

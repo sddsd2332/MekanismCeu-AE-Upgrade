@@ -6,6 +6,7 @@ import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import io.netty.buffer.ByteBuf;
 import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
 import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
 import mekanism.api.Coord4D;
@@ -40,64 +41,68 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
             if (!(tile instanceof IAEUpgradeHost host) || !PacketHandler.canAccessTile(player, tile, true)) {
                 return;
             }
-            if (!host.hasAEUpgrade()) {
-                sendSnapshot(host, player instanceof EntityPlayerMP playerMP ? playerMP : null);
+            if (!message.configType.isInstalledIn(host)) {
+                sendSnapshot(host, player instanceof EntityPlayerMP playerMP ? playerMP : null, message.configType);
                 return;
             }
             switch (message.packetType) {
                 case REQUEST -> {
                 }
-                case TOGGLE_ROUTE -> AERecipeProfileManager.toggleRoute(host, player, message.routeKey);
-                case TOGGLE_PRODUCT -> AERecipeProfileManager.toggleProduct(host, player, message.outputKey);
-                case DISABLE_PRODUCT -> AERecipeProfileManager.disableProduct(host, player, message.outputKey);
-                case MOVE_PRODUCT -> AERecipeProfileManager.moveProduct(host, player, message.outputKey, message.direction);
-                case MOVE_ROUTE -> AERecipeProfileManager.moveRoute(host, player, message.outputKey, message.routeKey, message.direction);
-                case MOVE_PRODUCT_TO_TOP -> AERecipeProfileManager.moveProductToEdge(host, player, message.outputKey, true);
-                case MOVE_PRODUCT_TO_BOTTOM -> AERecipeProfileManager.moveProductToEdge(host, player, message.outputKey, false);
-                case MOVE_ROUTE_TO_TOP -> AERecipeProfileManager.moveRouteToEdge(host, player, message.outputKey, message.routeKey, true);
-                case MOVE_ROUTE_TO_BOTTOM -> AERecipeProfileManager.moveRouteToEdge(host, player, message.outputKey, message.routeKey, false);
-                case SET_GLOBAL_CRAFT_AMOUNT -> AERecipeProfileManager.setGlobalCraftAmount(host, player, message.amount);
-                case SET_ROUTE_CRAFT_AMOUNT -> AERecipeProfileManager.setRouteCraftAmount(host, player, message.routeKey, message.amount);
-                case CLEAR_ROUTE_CRAFT_AMOUNT -> AERecipeProfileManager.clearRouteCraftAmount(host, player, message.routeKey);
-                case RESET_PRODUCT -> AERecipeProfileManager.resetProduct(host, player, message.outputKey);
-                case RESET_ALL -> AERecipeProfileManager.resetAll(host, player);
-                case TOGGLE_PROFILE_MODE -> AERecipeProfileManager.toggleProfileMode(host, player);
-                case CYCLE_GLOBAL_PROFILE -> AERecipeProfileManager.cycleGlobalProfileSlot(host, player, message.direction);
-                case TOGGLE_ROUTE_FILTER_MODE -> AERecipeProfileManager.toggleRouteFilterMode(host, player);
-                case SET_ALL_ROUTES_ENABLED -> AERecipeProfileManager.setAllRoutesEnabled(host, player, message.direction > 0);
+                case TOGGLE_ROUTE -> AERecipeProfileManager.toggleRoute(host, player, message.routeKey, message.configType);
+                case TOGGLE_PRODUCT -> AERecipeProfileManager.toggleProduct(host, player, message.outputKey, message.configType);
+                case DISABLE_PRODUCT -> AERecipeProfileManager.disableProduct(host, player, message.outputKey, message.configType);
+                case MOVE_PRODUCT -> AERecipeProfileManager.moveProduct(host, player, message.outputKey, message.direction, message.configType);
+                case MOVE_ROUTE -> AERecipeProfileManager.moveRoute(host, player, message.outputKey, message.routeKey, message.direction, message.configType);
+                case MOVE_PRODUCT_TO_TOP -> AERecipeProfileManager.moveProductToEdge(host, player, message.outputKey, true, message.configType);
+                case MOVE_PRODUCT_TO_BOTTOM -> AERecipeProfileManager.moveProductToEdge(host, player, message.outputKey, false, message.configType);
+                case MOVE_ROUTE_TO_TOP -> AERecipeProfileManager.moveRouteToEdge(host, player, message.outputKey, message.routeKey, true, message.configType);
+                case MOVE_ROUTE_TO_BOTTOM -> AERecipeProfileManager.moveRouteToEdge(host, player, message.outputKey, message.routeKey, false, message.configType);
+                case SET_GLOBAL_CRAFT_AMOUNT -> AERecipeProfileManager.setGlobalCraftAmount(host, player, message.amount, message.configType);
+                case SET_ROUTE_CRAFT_AMOUNT -> AERecipeProfileManager.setRouteCraftAmount(host, player, message.routeKey, message.amount, message.configType);
+                case CLEAR_ROUTE_CRAFT_AMOUNT -> AERecipeProfileManager.clearRouteCraftAmount(host, player, message.routeKey, message.configType);
+                case RESET_PRODUCT -> AERecipeProfileManager.resetProduct(host, player, message.outputKey, message.configType);
+                case RESET_ALL -> AERecipeProfileManager.resetAll(host, player, message.configType);
+                case TOGGLE_PROFILE_MODE -> AERecipeProfileManager.toggleProfileMode(host, player, message.configType);
+                case CYCLE_GLOBAL_PROFILE -> AERecipeProfileManager.cycleGlobalProfileSlot(host, player, message.direction, message.configType);
+                case TOGGLE_ROUTE_FILTER_MODE -> AERecipeProfileManager.toggleRouteFilterMode(host, player, message.configType);
+                case SET_ALL_ROUTES_ENABLED -> AERecipeProfileManager.setAllRoutesEnabled(host, player, message.direction > 0, message.configType);
                 case SNAPSHOT -> {
                     return;
                 }
             }
-            sendSnapshots(tile, host, player);
+            sendSnapshots(tile, host, player, message.configType);
         }, player);
         return null;
     }
 
-    private void sendSnapshots(TileEntity tile, IAEUpgradeHost host, EntityPlayer fallbackPlayer) {
+    private void sendSnapshots(TileEntity tile, IAEUpgradeHost host, EntityPlayer fallbackPlayer, AERecipeConfigType type) {
         if (tile instanceof TileEntityBasicBlock basic && !basic.playersUsing.isEmpty()) {
             for (EntityPlayer user : basic.playersUsing) {
                 if (user instanceof EntityPlayerMP userMP && PacketHandler.canAccessTile(user, tile, true)) {
-                    sendSnapshot(host, userMP);
+                    sendSnapshot(host, userMP, type);
                 }
             }
         } else if (fallbackPlayer instanceof EntityPlayerMP playerMP) {
-            sendSnapshot(host, playerMP);
+            sendSnapshot(host, playerMP, type);
         }
     }
 
     private void sendSnapshot(IAEUpgradeHost host, EntityPlayerMP player) {
+        sendSnapshot(host, player, AERecipeConfigType.CRAFTING);
+    }
+
+    private void sendSnapshot(IAEUpgradeHost host, EntityPlayerMP player, AERecipeConfigType type) {
         if (player == null) {
             return;
         }
         TileEntity tile = (TileEntity) host;
-        AERecipeConfigSnapshot snapshot = AERecipeProfileManager.buildSnapshot(host, player);
-        MEKCeuAEUpgrade.packetHandler.sendTo(AERecipeConfigMessage.snapshot(Coord4D.get(tile), snapshot), player);
+        AERecipeConfigSnapshot snapshot = AERecipeProfileManager.buildSnapshot(host, player, type);
+        MEKCeuAEUpgrade.packetHandler.sendTo(AERecipeConfigMessage.snapshot(Coord4D.get(tile), snapshot, type), player);
     }
 
     private void handleClient(AERecipeConfigMessage message) {
         if (message.packetType == RecipeConfigPacket.SNAPSHOT && message.coord4D != null) {
-            AERecipeConfigClientCache.setSnapshot(message.coord4D, AERecipeConfigSnapshot.read(message.payload));
+            AERecipeConfigClientCache.setSnapshot(message.coord4D, message.configType, AERecipeConfigSnapshot.read(message.payload));
         }
     }
 
@@ -132,21 +137,37 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
         public String routeKey = "";
         public int direction;
         public int amount;
+        public AERecipeConfigType configType = AERecipeConfigType.CRAFTING;
         public NBTTagCompound payload = new NBTTagCompound();
 
         public AERecipeConfigMessage() {
         }
 
         public AERecipeConfigMessage(Coord4D coord) {
+            this(coord, AERecipeConfigType.CRAFTING);
+        }
+
+        public AERecipeConfigMessage(Coord4D coord, AERecipeConfigType type) {
             coord4D = coord;
+            configType = type == null ? AERecipeConfigType.CRAFTING : type;
         }
 
         public AERecipeConfigMessage(Coord4D coord, RecipeConfigPacket packetType, String outputKey, String routeKey, int direction) {
-            this(coord, packetType, outputKey, routeKey, direction, 0);
+            this(coord, AERecipeConfigType.CRAFTING, packetType, outputKey, routeKey, direction, 0);
         }
 
         public AERecipeConfigMessage(Coord4D coord, RecipeConfigPacket packetType, String outputKey, String routeKey, int direction, int amount) {
+            this(coord, AERecipeConfigType.CRAFTING, packetType, outputKey, routeKey, direction, amount);
+        }
+
+        public AERecipeConfigMessage(Coord4D coord, AERecipeConfigType type, RecipeConfigPacket packetType, String outputKey, String routeKey, int direction) {
+            this(coord, type, packetType, outputKey, routeKey, direction, 0);
+        }
+
+        public AERecipeConfigMessage(Coord4D coord, AERecipeConfigType type, RecipeConfigPacket packetType, String outputKey, String routeKey, int direction,
+              int amount) {
             coord4D = coord;
+            configType = type == null ? AERecipeConfigType.CRAFTING : type;
             this.packetType = packetType;
             this.outputKey = outputKey == null ? "" : outputKey;
             this.routeKey = routeKey == null ? "" : routeKey;
@@ -155,7 +176,12 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
         }
 
         public static AERecipeConfigMessage snapshot(Coord4D coord, AERecipeConfigSnapshot snapshot) {
+            return snapshot(coord, snapshot, AERecipeConfigType.CRAFTING);
+        }
+
+        public static AERecipeConfigMessage snapshot(Coord4D coord, AERecipeConfigSnapshot snapshot, AERecipeConfigType type) {
             AERecipeConfigMessage message = new AERecipeConfigMessage(coord);
+            message.configType = type == null ? AERecipeConfigType.CRAFTING : type;
             message.packetType = RecipeConfigPacket.SNAPSHOT;
             message.payload = snapshot.write(new NBTTagCompound());
             return message;
@@ -164,6 +190,7 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
         @Override
         public void toBytes(ByteBuf dataStream) {
             dataStream.writeInt(packetType.ordinal());
+            dataStream.writeInt(configType.ordinal());
             coord4D.write(dataStream);
             PacketHandler.writeString(dataStream, outputKey);
             PacketHandler.writeString(dataStream, routeKey);
@@ -175,6 +202,7 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
         @Override
         public void fromBytes(ByteBuf dataStream) {
             packetType = MekanismUtils.getByIndex(RecipeConfigPacket.values(), dataStream.readInt(), RecipeConfigPacket.REQUEST);
+            configType = AERecipeConfigType.byIndex(dataStream.readInt());
             coord4D = Coord4D.read(dataStream);
             outputKey = PacketHandler.readString(dataStream);
             routeKey = PacketHandler.readString(dataStream);

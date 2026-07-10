@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 public final class AEHybridRecipeAdapters {
 
@@ -128,9 +129,16 @@ public final class AEHybridRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(extraSlot.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainItem(node, outputSlot.get());
+            }
+
         };
     }
 
@@ -204,9 +212,16 @@ public final class AEHybridRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.gas("gas_output", outputTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(gasTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainGas(node, outputTank.get());
+            }
+
         };
     }
 
@@ -301,9 +316,17 @@ public final class AEHybridRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(gasSlot.get());
+                observer.accept(gasTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainItem(node, outputSlot.get());
+            }
+
         };
     }
 
@@ -382,9 +405,17 @@ public final class AEHybridRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()), AERecipePort.gas("gas_output", outputGasTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(fluidTank.get());
+                observer.accept(gasTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainItemAndGas(node, outputSlot.get(), outputGasTank.get());
+            }
+
         };
     }
 
@@ -423,7 +454,7 @@ public final class AEHybridRecipeAdapters {
             return null;
         }
         if (!AEItemRecipeAdapters.canOutputToSlot(outputSlot, exposedRecipe.getOutputStack())) {
-            AEItemRecipeAdapters.reject(host, "output slot cannot accept {}", AEUpgradeDebug.stack(exposedRecipe.getOutputStack()));
+            AEItemRecipeAdapters.reject(host, "output slot cannot accept {}", AEUpgradeDebug.outputStack(exposedRecipe));
             return null;
         }
         ItemStack inputRemainder = inputSlot.insertItem(stacks.get(0).copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
@@ -536,7 +567,7 @@ public final class AEHybridRecipeAdapters {
         GasStack requiredOutput = scaledGasStack(machineRecipe.getOutput().output, operations);
         if (!AEUpgradeFakeGas.outputMatches(exposedRecipe.getOutputStack(), requiredOutput)) {
             AEItemRecipeAdapters.reject(host, "machine gas output {} does not match exposed output {}",
-                  requiredOutput, AEUpgradeDebug.stack(exposedRecipe.getOutputStack()));
+                  requiredOutput, AEUpgradeDebug.outputStack(exposedRecipe));
             return null;
         }
         if (!canGasStackInsert(outputTank, requiredOutput)) {
@@ -600,7 +631,7 @@ public final class AEHybridRecipeAdapters {
         int operations = getOutputOperations(machineRecipe.getOutput().output, exposedRecipe.getOutputStack());
         if (operations <= 0) {
             AEItemRecipeAdapters.reject(host, "machine output {} does not match exposed output {}",
-                  AEUpgradeDebug.stack(machineRecipe.getOutput().output), AEUpgradeDebug.stack(exposedRecipe.getOutputStack()));
+                  AEUpgradeDebug.stack(machineRecipe.getOutput().output), AEUpgradeDebug.outputStack(exposedRecipe));
             return null;
         }
         ItemStack requiredInput = scaledStack(machineRecipe.getInput().getSolid(), operations);
@@ -616,7 +647,7 @@ public final class AEHybridRecipeAdapters {
             return null;
         }
         if (!AEItemRecipeAdapters.canOutputToSlot(outputSlot, exposedRecipe.getOutputStack())) {
-            AEItemRecipeAdapters.reject(host, "output slot cannot accept {}", AEUpgradeDebug.stack(exposedRecipe.getOutputStack()));
+            AEItemRecipeAdapters.reject(host, "output slot cannot accept {}", AEUpgradeDebug.outputStack(exposedRecipe));
             return null;
         }
         ItemStack inputRemainder = inputSlot.insertItem(stacks.get(0).copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
@@ -695,7 +726,7 @@ public final class AEHybridRecipeAdapters {
             return null;
         }
         if (!outputsMatch(exposedRecipe, machineRecipe.getOutput(), operations)) {
-            AEItemRecipeAdapters.reject(host, "machine outputs do not match exposed outputs {}", AEUpgradeDebug.stacks(exposedRecipe.getOutputStacks()));
+            AEItemRecipeAdapters.reject(host, "machine outputs do not match exposed outputs {}", AEUpgradeDebug.outputStacks(exposedRecipe));
             return null;
         }
         if (!canPressurizedInputsAccept(inputSlot, fluidTank, gasTank, stacks.get(0), fluidInput, gasInput)) {

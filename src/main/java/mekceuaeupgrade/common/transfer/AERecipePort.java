@@ -151,6 +151,33 @@ public abstract class AERecipePort {
         return drained;
     }
 
+    public static boolean drainItem(AEUpgradeNode node, @Nullable IInventorySlot slot) {
+        return slot != null && AEUpgradeOutputDrainer.drainItemSlot(node, slot);
+    }
+
+    public static boolean drainItems(AEUpgradeNode node, @Nullable IInventorySlot first, @Nullable IInventorySlot second) {
+        boolean drained = drainItem(node, first);
+        return drainItem(node, second) || drained;
+    }
+
+    public static boolean drainGas(AEUpgradeNode node, @Nullable IExtendedGasTank tank) {
+        return tank != null && AEUpgradeOutputDrainer.drainGasTank(node, tank);
+    }
+
+    public static boolean drainGases(AEUpgradeNode node, @Nullable IExtendedGasTank first, @Nullable IExtendedGasTank second) {
+        boolean drained = drainGas(node, first);
+        return drainGas(node, second) || drained;
+    }
+
+    public static boolean drainFluid(AEUpgradeNode node, @Nullable IExtendedFluidTank tank) {
+        return tank != null && AEUpgradeOutputDrainer.drainFluidTank(node, tank);
+    }
+
+    public static boolean drainItemAndGas(AEUpgradeNode node, @Nullable IInventorySlot slot, @Nullable IExtendedGasTank tank) {
+        boolean drained = drainItem(node, slot);
+        return drainGas(node, tank) || drained;
+    }
+
     /**
      * 单个端口的状态快照。
      */

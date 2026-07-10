@@ -20,6 +20,7 @@ public class MEKCeuAEUpgradeMixin implements ILateMixinLoader {
     private static final Map<String, BooleanSupplier> MIXIN_CONFIGS = new LinkedHashMap<>();
 
     static {
+        addModdedMixinCFG("mixins.mekceuaeupgrade.appeng.json", "appliedenergistics2");
         addModdedMixinCFG("mixins.mekceuaeupgrade.json", "mekanism");
         addModdedMixinCFG("mixins.mekceuaeupgrade.multiblockmachine.json", "mekanismmultiblockmachine");
         addModdedMixinCFG("mixins.mekceuaeupgrade.mekceumoremachine.json", "mekceumoremachine");

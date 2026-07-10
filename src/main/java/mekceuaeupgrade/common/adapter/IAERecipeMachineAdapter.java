@@ -9,6 +9,7 @@ import net.minecraft.item.ItemStack;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface IAERecipeMachineAdapter {
 
@@ -38,6 +39,15 @@ public interface IAERecipeMachineAdapter {
 
     default boolean canAcceptAnyItemInput(IAEItemRecipeHost host) {
         return false;
+    }
+
+    /**
+     * 枚举自动处理实际可能写入的输入槽位和储罐。
+     *
+     * @param host 当前机器
+     * @param observer 接收输入容器的观察器
+     */
+    default void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
     }
 
     default boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {

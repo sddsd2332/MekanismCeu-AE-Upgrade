@@ -2,11 +2,9 @@ package mekceuaeupgrade.mixin.mekceumoremachine;
 
 import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
 
 import mekanism.api.IConfigCardAccess.ISpecialConfigData;
 import mekanism.common.capabilities.Capabilities;
@@ -77,11 +75,6 @@ public abstract class MixinTileEntityTierSolarNeutronActivator implements IAERec
         if (!mekceuaeupgrade$self().isCapabilityDisabled(capability, side) && capability == Capabilities.SPECIAL_CONFIG_DATA_CAPABILITY) {
             cir.setReturnValue((T) (Object) this);
         }
-    }
-
-    @Inject(method = "onAsyncUpdateServer", at = @At("TAIL"))
-    private void mekceuaeupgrade$onAsyncUpdateServer(CallbackInfo ci) {
-        mekceuaeupgrade$tickAEUpgradeServer();
     }
 
     @Inject(method = "onRecipeCacheInvalidated", at = @At("TAIL"))

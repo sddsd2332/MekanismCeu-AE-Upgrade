@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public interface IAEItemRecipeHost extends IAEUpgradeHost {
 
@@ -40,6 +41,14 @@ public interface IAEItemRecipeHost extends IAEUpgradeHost {
     }
 
     boolean canAcceptAnyAEItemInput();
+
+    /**
+     * 枚举自动处理使用的输入槽位和储罐。
+     *
+     * @param observer 接收输入容器的观察器
+     */
+    default void observeAEInputContainers(Consumer<Object> observer) {
+    }
 
     boolean drainAEItemOutputs(AEUpgradeNode node);
 }

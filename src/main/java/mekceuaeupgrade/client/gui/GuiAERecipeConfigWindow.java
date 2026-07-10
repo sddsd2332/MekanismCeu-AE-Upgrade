@@ -8,6 +8,7 @@ import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
 import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Product;
 import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Route;
 import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.config.AERecipeProfile;
 import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
 import mekceuaeupgrade.common.network.PacketAERecipeConfig.RecipeConfigPacket;
@@ -68,12 +69,15 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     private static final int ROW_FOCUSED_SELECTED_COLOR = 0xB04E9FDB;
     private static final int ROW_SELECTED_OUTLINE_COLOR = 0xFF8FC7FF;
     private static final int ROW_FOCUSED_SELECTED_OUTLINE_COLOR = 0xFFDDF2FF;
+    private static final int ROW_LOCKED_INNER_COLOR = 0x70C72F2F;
+    private static final int ROW_LOCKED_INNER_OUTLINE_COLOR = 0xFFE05A5A;
     private static final int SCROLL_ITEM_STEP = 18;
     private static final double SCROLL_PIXELS_PER_SECOND = 12.0D;
     private static final double MIN_SCROLL_EDGE_PAUSE = 0.5D;
 
     private final TileEntityContainerBlock tile;
     private final Coord4D coord;
+    private final AERecipeConfigType configType;
     private final ProductScrollList productList;
     private final RouteScrollList routeList;
     private final TranslationButton productFilterButton;
@@ -202,11 +206,16 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     public GuiAERecipeConfigWindow(IGuiWrapper gui, int x, int y, TileEntityContainerBlock tile, SelectedWindowData windowData) {
+        this(gui, x, y, tile, windowData, AERecipeConfigType.byWindowType(windowData.type));
+    }
+
+    public GuiAERecipeConfigWindow(IGuiWrapper gui, int x, int y, TileEntityContainerBlock tile, SelectedWindowData windowData, AERecipeConfigType configType) {
         super(gui, x, y, WIDTH, HEIGHT, windowData);
-        if (windowData.type != AEUpgradeWindowTypes.AE_RECIPE_CONFIG) {
+        if (windowData.type != configType.getWindowType()) {
             throw new IllegalArgumentException("AE recipe config windows must have an AE recipe config window type");
         }
         this.tile = tile;
+        this.configType = configType;
         coord = Coord4D.get(tile);
         interactionStrategy = InteractionStrategy.ALL;
         profileModeButton = addChild(new TranslationButton(gui, relativeX + PROFILE_MODE_BUTTON_X, relativeY + 6, PROFILE_MODE_BUTTON_WIDTH, 12,
@@ -294,7 +303,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                   sendResetAllAction();
                   return true;
               }));
-        AERecipeConfigClientCache.clear(coord);
+        AERecipeConfigClientCache.clear(coord, configType);
         if (isConfigAvailable()) {
             requestSnapshot();
         }
@@ -303,14 +312,14 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     public GuiAERecipeConfigWindow(IGuiWrapper gui, int x, int y, TileEntityContainerBlock tile) {
-        this(gui, x, y, tile, new SelectedWindowData(AEUpgradeWindowTypes.AE_RECIPE_CONFIG));
+        this(gui, x, y, tile, new SelectedWindowData(AEUpgradeWindowTypes.AE_RECIPE_CONFIG), AERecipeConfigType.CRAFTING);
     }
 
     @Override
     public void tick() {
         super.tick();
         if (!isConfigAvailable()) {
-            AERecipeConfigClientCache.clear(coord);
+            AERecipeConfigClientCache.clear(coord, configType);
             snapshot = AERecipeConfigSnapshot.EMPTY;
             validateSelection();
             updateButtons();
@@ -328,13 +337,13 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         }
         closed = true;
         super.close();
-        AERecipeConfigClientCache.clear(coord);
+        AERecipeConfigClientCache.clear(coord, configType);
     }
 
     @Override
     public void renderForeground(int mouseX, int mouseY) {
         super.renderForeground(mouseX, mouseY);
-        drawTitleText(AELang.AE_RECIPE_CONFIG.translate(), 5);
+        drawTitleText(configType.getTitle().translate(), 5);
         if (searchField.isEmpty() && !searchField.isFocused()) {
             drawScaledScrollingString(AELang.AE_RECIPE_CONFIG_SEARCH.translate(), PRODUCT_SEARCH_X + 5, 24, TextAlignment.LEFT, 0x707070,
                   PRODUCT_SEARCH_WIDTH - 7, 0, false, 0.8F,
@@ -369,8 +378,9 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         super.renderToolTip(mouseX, mouseY);
         if (showTooltip(profileModeButton, AELang.AE_RECIPE_CONFIG_PROFILE_MODE_TOOLTIP, mouseX, mouseY) ||
               showTooltip(globalProfileButton, AELang.AE_RECIPE_CONFIG_PROFILE_SLOT_TOOLTIP, mouseX, mouseY) ||
-              showTooltip(routeFilterModeButton, AELang.AE_RECIPE_CONFIG_FILTER_MODE_TOOLTIP, mouseX, mouseY) ||
-              showTooltip(productFilterButton, AELang.AE_RECIPE_CONFIG_PRODUCT_FILTER_TOOLTIP, mouseX, mouseY) ||
+              (configType.isRouteFilterMutable() && showTooltip(routeFilterModeButton, AELang.AE_RECIPE_CONFIG_FILTER_MODE_TOOLTIP, mouseX, mouseY)) ||
+              showTooltip(productFilterButton, configType == AERecipeConfigType.AUTO_PROCESSING ?
+                    AELang.AE_AUTO_PROCESSING_PRODUCT_FILTER_TOOLTIP : AELang.AE_RECIPE_CONFIG_PRODUCT_FILTER_TOOLTIP, mouseX, mouseY) ||
               showTooltip(searchField, AELang.AE_RECIPE_CONFIG_SEARCH_TOOLTIP, mouseX, mouseY) ||
               showTooltip(toggleButton, AELang.AE_RECIPE_CONFIG_TOGGLE_BUTTON_TOOLTIP, mouseX, mouseY) ||
               showTooltip(upButton, AELang.AE_RECIPE_CONFIG_MOVE_UP_BUTTON_TOOLTIP, mouseX, mouseY) ||
@@ -411,6 +421,11 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         }
     }
 
+    private void drawLockedRouteInner(int x, int y, int width, int height) {
+        GuiUtils.fill(x + 2, y + 2, x + width - 2, y + height - 2, ROW_LOCKED_INNER_COLOR);
+        GuiUtils.drawOutline(x + 2, y + 2, width - 4, height - 4, ROW_LOCKED_INNER_OUTLINE_COLOR);
+    }
+
     private boolean isMouseOverArea(double mouseX, double mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
@@ -427,15 +442,15 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void requestSnapshot() {
-        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord));
+        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType));
     }
 
     private boolean isConfigAvailable() {
-        return GuiAERecipeConfigWindowTab.canOpen(tile);
+        return GuiAERecipeConfigWindowTab.canOpen(tile, configType);
     }
 
     private void updateFromCache() {
-        AERecipeConfigSnapshot cached = AERecipeConfigClientCache.getSnapshot(coord);
+        AERecipeConfigSnapshot cached = AERecipeConfigClientCache.getSnapshot(coord, configType);
         if (cached != null && cached != snapshot) {
             snapshot = cached;
             validateSelection();
@@ -469,23 +484,23 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         boolean hasProduct = product != null;
         boolean hasRoute = route != null;
         boolean ctrlDown = GuiScreen.isCtrlKeyDown();
-        toggleButton.active = ctrlDown ? hasProduct : hasRoute;
+        toggleButton.active = ctrlDown ? hasModifiableRoute(product) : hasRoute && route.isModifiable();
         if (selectionFocus == SelectionFocus.PRODUCT) {
             int productIndex = getProductIndex(product);
-            upButton.active = productIndex > 0;
-            downButton.active = productIndex >= 0 && productIndex < snapshot.getProducts().size() - 1;
+            upButton.active = hasModifiableRoute(product) && productIndex > 0;
+            downButton.active = hasModifiableRoute(product) && productIndex >= 0 && productIndex < snapshot.getProducts().size() - 1;
         } else {
-            upButton.active = hasRoute && route.getOrder() > 0;
-            downButton.active = hasRoute && product != null && route.getOrder() < product.getRoutes().size() - 1;
+            upButton.active = hasRoute && route.isModifiable() && route.getOrder() > 0;
+            downButton.active = hasRoute && route.isModifiable() && product != null && route.getOrder() < product.getRoutes().size() - 1;
         }
-        resetProductButton.active = hasProduct;
-        resetAllButton.active = !snapshot.isEmpty();
+        resetProductButton.active = hasModifiableRoute(product);
+        resetAllButton.active = hasAnyModifiableRoute();
         productFilterButton.active = !snapshot.isEmpty();
-        globalAmountField.active = isConfigAvailable() && !snapshot.isEmpty();
-        routeAmountField.active = hasRoute;
+        globalAmountField.active = isConfigAvailable() && hasAnyModifiableRoute();
+        routeAmountField.active = hasRoute && route.isModifiable();
         profileModeButton.active = isConfigAvailable() && !snapshot.isEmpty();
-        routeFilterModeButton.visible = !snapshot.isEmpty();
-        routeFilterModeButton.active = isConfigAvailable() && !snapshot.isEmpty();
+        routeFilterModeButton.visible = configType.isRouteFilterMutable() && !snapshot.isEmpty();
+        routeFilterModeButton.active = configType.isRouteFilterMutable() && isConfigAvailable() && !snapshot.isEmpty();
         globalProfileButton.visible = !snapshot.isIndividualProfile() && !snapshot.isEmpty();
         globalProfileButton.active = isConfigAvailable() && !snapshot.isEmpty() && !snapshot.isIndividualProfile();
         updateProfileButtonLayout();
@@ -504,12 +519,14 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void updateProfileButtonLayout() {
-        if (snapshot.isIndividualProfile()) {
-            moveElementToX(routeFilterModeButton, getGuiLeft() + relativeX + PROFILE_MODE_BUTTON_X);
-            routeFilterModeButton.setWidth(PROFILE_MODE_BUTTON_WIDTH);
-        } else {
-            moveElementToX(routeFilterModeButton, getGuiLeft() + relativeX + ROUTE_FILTER_MODE_BUTTON_X);
-            routeFilterModeButton.setWidth(ROUTE_FILTER_MODE_BUTTON_WIDTH);
+        if (configType.isRouteFilterMutable()) {
+            if (snapshot.isIndividualProfile()) {
+                moveElementToX(routeFilterModeButton, getGuiLeft() + relativeX + PROFILE_MODE_BUTTON_X);
+                routeFilterModeButton.setWidth(PROFILE_MODE_BUTTON_WIDTH);
+            } else {
+                moveElementToX(routeFilterModeButton, getGuiLeft() + relativeX + ROUTE_FILTER_MODE_BUTTON_X);
+                routeFilterModeButton.setWidth(ROUTE_FILTER_MODE_BUTTON_WIDTH);
+            }
         }
         moveElementToX(globalProfileButton, getGuiLeft() + relativeX + PROFILE_MODE_BUTTON_X);
         globalProfileButton.setWidth(PROFILE_MODE_BUTTON_WIDTH);
@@ -531,14 +548,18 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         if (snapshot.isEmpty()) {
             return false;
         }
+        boolean foundModifiable = false;
         for (Product product : snapshot.getProducts()) {
             for (Route route : product.getRoutes()) {
-                if (!route.isEnabled()) {
-                    return false;
+                if (route.isModifiable()) {
+                    foundModifiable = true;
+                    if (!route.isEnabled()) {
+                        return false;
+                    }
                 }
             }
         }
-        return true;
+        return foundModifiable;
     }
 
     private int getProductIndex(@Nullable Product product) {
@@ -592,7 +613,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
 
     private boolean isProductEnabled(Product product) {
         for (Route route : product.getRoutes()) {
-            if (route.isEnabled()) {
+            if (route.isModifiable() && route.isEnabled()) {
                 return true;
             }
         }
@@ -603,12 +624,36 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         boolean hasEnabled = false;
         boolean hasDisabled = false;
         for (Route route : product.getRoutes()) {
+            if (!route.isModifiable()) {
+                continue;
+            }
             if (route.isEnabled()) {
                 hasEnabled = true;
             } else {
                 hasDisabled = true;
             }
             if (hasEnabled && hasDisabled) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasModifiableRoute(@Nullable Product product) {
+        if (product == null) {
+            return false;
+        }
+        for (Route route : product.getRoutes()) {
+            if (route.isModifiable()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAnyModifiableRoute() {
+        for (Product product : snapshot.getProducts()) {
+            if (hasModifiableRoute(product)) {
                 return true;
             }
         }
@@ -623,6 +668,9 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private AELang getProductEnabledIndicatorLang(Product product) {
+        if (!hasModifiableRoute(product)) {
+            return AELang.AE_RECIPE_CONFIG_ROUTE_SELF_REFERENTIAL;
+        }
         if (isProductPartiallyEnabled(product)) {
             return AELang.AE_RECIPE_CONFIG_ROUTE_PARTIAL;
         }
@@ -649,8 +697,8 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         }
         Product product = getSelectedProduct();
         Route route = getSelectedRoute();
-        if (product != null && route != null) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, packetType, product.getOutputKey(), route.getRouteKey(), direction));
+        if (product != null && route != null && route.isModifiable()) {
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, packetType, product.getOutputKey(), route.getRouteKey(), direction));
         }
     }
 
@@ -691,30 +739,30 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             return;
         }
         String outputKey = selectedOutputKey == null ? "" : selectedOutputKey;
-        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, packetType, outputKey, "", direction));
+        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, packetType, outputKey, "", direction));
     }
 
     private void sendProfileModeAction() {
         if (isConfigAvailable() && !snapshot.isEmpty()) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.TOGGLE_PROFILE_MODE, "", "", 0));
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.TOGGLE_PROFILE_MODE, "", "", 0));
         }
     }
 
     private void sendRouteFilterModeAction() {
-        if (isConfigAvailable() && !snapshot.isEmpty()) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.TOGGLE_ROUTE_FILTER_MODE, "", "", 0));
+        if (configType.isRouteFilterMutable() && isConfigAvailable() && !snapshot.isEmpty()) {
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.TOGGLE_ROUTE_FILTER_MODE, "", "", 0));
         }
     }
 
     private void sendGlobalProfileAction(int direction) {
         if (isConfigAvailable() && !snapshot.isEmpty() && !snapshot.isIndividualProfile()) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.CYCLE_GLOBAL_PROFILE, "", "", direction));
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.CYCLE_GLOBAL_PROFILE, "", "", direction));
         }
     }
 
     private void sendResetAllAction() {
         if (GuiScreen.isShiftKeyDown()) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.SET_ALL_ROUTES_ENABLED, "", "",
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.SET_ALL_ROUTES_ENABLED, "", "",
                   areAllRoutesEnabled() ? 0 : 1));
         } else {
             sendProductAction(RecipeConfigPacket.RESET_ALL);
@@ -726,7 +774,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             return;
         }
         int amount = parseCraftAmount(globalAmountField.getText(), AERecipeProfile.DEFAULT_CRAFT_AMOUNT, snapshot.getMaxCraftAmount());
-        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.SET_GLOBAL_CRAFT_AMOUNT, "", "", 0, amount));
+        MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.SET_GLOBAL_CRAFT_AMOUNT, "", "", 0, amount));
     }
 
     private void sendRouteCraftAmountAction() {
@@ -735,15 +783,15 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         }
         Product product = getSelectedProduct();
         Route route = getSelectedRoute();
-        if (product == null || route == null) {
+        if (product == null || route == null || !route.isModifiable()) {
             return;
         }
         if (routeAmountField.isEmpty()) {
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.CLEAR_ROUTE_CRAFT_AMOUNT,
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.CLEAR_ROUTE_CRAFT_AMOUNT,
                   product.getOutputKey(), route.getRouteKey(), 0));
         } else {
             int amount = parseCraftAmount(routeAmountField.getText(), snapshot.getCraftAmount(), route.getMaxCraftAmount());
-            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, RecipeConfigPacket.SET_ROUTE_CRAFT_AMOUNT,
+            MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.SET_ROUTE_CRAFT_AMOUNT,
                   product.getOutputKey(), route.getRouteKey(), 0, amount));
         }
     }
@@ -796,7 +844,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void cycleProductFilterMode() {
-        productFilterMode = productFilterMode.next();
+        productFilterMode = productFilterMode.next(configType == AERecipeConfigType.CRAFTING);
         productList.resetScroll();
         routeList.resetScroll();
         validateSelection();
@@ -840,7 +888,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
                 Product product = getHoveredProduct((int) mouseY);
-                if (product != null) {
+                if (product != null && hasModifiableRoute(product)) {
                     selectProduct(product);
                     sendProductAction(RecipeConfigPacket.TOGGLE_PRODUCT);
                     return true;
@@ -866,9 +914,15 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 boolean selected = product.getOutputKey().equals(selectedOutputKey);
                 boolean hovered = mouseX >= getX() + 1 && mouseX < getX() + barXShift - 1 && mouseY >= getY() + 1 + i * elementHeight
                       && mouseY < getY() + 1 + (i + 1) * elementHeight;
+                boolean modifiable = hasModifiableRoute(product);
                 drawRowSelection(relativeX + 1, y, barXShift - 2, elementHeight, selected, selectionFocus == SelectionFocus.PRODUCT, hovered);
+                if (!modifiable) {
+                    drawLockedRouteInner(relativeX + 1, y, barXShift - 2, elementHeight);
+                }
                 int indicatorX = relativeX + barXShift - 10;
-                GuiUtils.fill(indicatorX, y + 4, indicatorX + INDICATOR_SIZE, y + 4 + INDICATOR_SIZE, getProductEnabledIndicatorColor(product));
+                if (modifiable && product.hasMultipleRoutes()) {
+                    GuiUtils.fill(indicatorX, y + 4, indicatorX + INDICATOR_SIZE, y + 4 + INDICATOR_SIZE, getProductEnabledIndicatorColor(product));
+                }
                 if (product.hasMultipleRoutes()) {
                     GuiUtils.fill(indicatorX, y + 12, indicatorX + INDICATOR_SIZE, y + 12 + INDICATOR_SIZE, INDICATOR_MULTI_ROUTE);
                 }
@@ -904,10 +958,10 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 return;
             }
             int indicatorX = getX() + barXShift - 10;
-            if (mouseX >= indicatorX && mouseX < indicatorX + INDICATOR_SIZE) {
+            if (product.hasMultipleRoutes() && mouseX >= indicatorX && mouseX < indicatorX + INDICATOR_SIZE) {
                 int relativeMouseY = mouseY - getY() - 1;
                 int rowY = relativeMouseY % elementHeight;
-                if (rowY >= 4 && rowY < 4 + INDICATOR_SIZE) {
+                if (hasModifiableRoute(product) && rowY >= 4 && rowY < 4 + INDICATOR_SIZE) {
                     displayTooltip(getProductEnabledIndicatorLang(product).translate(), mouseX, mouseY);
                     return;
                 } else if (product.hasMultipleRoutes() && rowY >= 12 && rowY < 12 + INDICATOR_SIZE) {
@@ -919,6 +973,8 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             ItemStack hoveredStack = getHoveredScrollingStack(outputs, mouseX, mouseY, relativeX + 4, relativeY + 4 + visibleIndex * elementHeight, 18, 16);
             if (hoveredStack != null) {
                 gui().renderItemTooltip(hoveredStack, mouseX, mouseY);
+            } else if (!hasModifiableRoute(product)) {
+                displayTooltip(AELang.AE_RECIPE_CONFIG_ROUTE_SELF_REFERENTIAL.translate(), mouseX, mouseY);
             } else if (outputs.size() > 1) {
                 displayTooltips(getStackNames(outputs), mouseX, mouseY);
             } else if (product.hasMultipleRoutes()) {
@@ -997,7 +1053,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
                 Route route = getHoveredRoute((int) mouseY);
-                if (route != null) {
+                if (route != null && route.isModifiable()) {
                     selectRoute(route);
                     sendRouteAction(RecipeConfigPacket.TOGGLE_ROUTE, 0);
                     return true;
@@ -1023,7 +1079,12 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 boolean hovered = mouseX >= getX() + 1 && mouseX < getX() + barXShift - 1 && mouseY >= getY() + 1 + i * elementHeight
                       && mouseY < getY() + 1 + (i + 1) * elementHeight;
                 drawRowSelection(relativeX + 1, y, barXShift - 2, elementHeight, selected, selectionFocus == SelectionFocus.ROUTE, hovered);
-                GuiUtils.fill(relativeX + barXShift - 10, y + 4, relativeX + barXShift - 4, y + 10, route.isEnabled() ? 0xFF57C78B : 0xFFC75656);
+                if (!route.isModifiable()) {
+                    drawLockedRouteInner(relativeX + 1, y, barXShift - 2, elementHeight);
+                } else {
+                    GuiUtils.fill(relativeX + barXShift - 10, y + 4, relativeX + barXShift - 4, y + 10,
+                          route.isEnabled() ? 0xFF57C78B : 0xFFC75656);
+                }
             }
         }
 
@@ -1038,7 +1099,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 int y = relativeY + 4 + i * elementHeight;
                 List<ItemStack> inputs = route.getInputStacks();
                 List<ItemStack> outputs = route.getOutputStacks();
-                int textColor = route.isEnabled() ? screenTextColor() : 0x8A8A8A;
+                int textColor = !route.isModifiable() ? 0xE6B0B0 : route.isEnabled() ? screenTextColor() : 0x8A8A8A;
                 int inputX = relativeX + 4;
                 int inputWidth = 38;
                 int outputWidth = 38;
@@ -1084,11 +1145,10 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 for (ItemStack output : outputs) {
                     tooltips.add(output.getDisplayName());
                 }
-                tooltips.add((route.isEnabled() ? AELang.AE_RECIPE_CONFIG_ROUTE_ENABLED : AELang.AE_RECIPE_CONFIG_ROUTE_DISABLED).translate().getFormattedText());
+                tooltips.add(getRouteStatusLang(route).translate().getFormattedText());
                 displayTooltips(tooltips, mouseX, mouseY);
             } else {
-                displayTooltip((route.isEnabled() ? AELang.AE_RECIPE_CONFIG_ROUTE_ENABLED : AELang.AE_RECIPE_CONFIG_ROUTE_DISABLED).translate(), mouseX,
-                      mouseY);
+                displayTooltip(getRouteStatusLang(route).translate(), mouseX, mouseY);
             }
         }
 
@@ -1138,6 +1198,13 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         }
     }
 
+    private AELang getRouteStatusLang(Route route) {
+        if (!route.isModifiable()) {
+            return AELang.AE_RECIPE_CONFIG_ROUTE_SELF_REFERENTIAL;
+        }
+        return route.isEnabled() ? AELang.AE_RECIPE_CONFIG_ROUTE_ENABLED : AELang.AE_RECIPE_CONFIG_ROUTE_DISABLED;
+    }
+
     private List<String> getStackNames(List<ItemStack> stacks) {
         List<String> names = new ArrayList<>();
         for (ItemStack stack : stacks) {
@@ -1164,6 +1231,17 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             boolean matches(Product product) {
                 return !product.hasMultipleRoutes();
             }
+        },
+        SELF_REFERENTIAL(AELang.AE_RECIPE_CONFIG_PRODUCTS_SELF_REFERENTIAL) {
+            @Override
+            boolean matches(Product product) {
+                for (Route route : product.getRoutes()) {
+                    if (!route.isModifiable()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
         };
 
         private final AELang label;
@@ -1176,9 +1254,10 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             return label;
         }
 
-        private ProductFilterMode next() {
+        private ProductFilterMode next(boolean includeSelfReferential) {
             ProductFilterMode[] modes = values();
-            return modes[(ordinal() + 1) % modes.length];
+            ProductFilterMode next = modes[(ordinal() + 1) % modes.length];
+            return !includeSelfReferential && next == SELF_REFERENTIAL ? ALL : next;
         }
 
         abstract boolean matches(Product product);

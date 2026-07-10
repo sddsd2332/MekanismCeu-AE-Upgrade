@@ -6,6 +6,7 @@ import mekceuaeupgrade.common.host.AEUpgradeNode;
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.storage.IMEInventory;
+import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.fluids.util.AEFluidStack;
@@ -19,6 +20,10 @@ import javax.annotation.Nullable;
  */
 public final class AEUpgradeFluidBridge {
 
+    private static volatile boolean channelResolved;
+    @Nullable
+    private static volatile IFluidStorageChannel fluidStorageChannel;
+
     /**
      * 工具类不允许实例化。
      */
@@ -29,11 +34,7 @@ public final class AEUpgradeFluidBridge {
      * @return 当前运行环境是否能访问 AE2 流体频道
      */
     public static boolean isAvailable() {
-        try {
-            return AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class) != null;
-        } catch (RuntimeException | LinkageError ignored) {
-            return false;
-        }
+        return getFluidStorageChannel() != null;
     }
 
     /**
@@ -49,9 +50,12 @@ public final class AEUpgradeFluidBridge {
         if (stack == null || stack.getFluid() == null || stack.amount <= 0 || !node.canUseNetwork()) {
             return stack;
         }
+        IFluidStorageChannel channel = getFluidStorageChannel();
+        if (channel == null) {
+            return stack;
+        }
         try {
-            IMEInventory<IAEFluidStack> inventory = node.getProxy().getStorage()
-                  .getInventory(AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class));
+            IMEInventory<IAEFluidStack> inventory = node.getInventory(channel);
             IAEFluidStack toInsert = AEFluidStack.fromFluidStack(stack);
             if (toInsert == null) {
                 return stack;
@@ -76,9 +80,12 @@ public final class AEUpgradeFluidBridge {
         if (request == null || request.getFluid() == null || request.amount <= 0 || !node.canUseNetwork()) {
             return null;
         }
+        IFluidStorageChannel channel = getFluidStorageChannel();
+        if (channel == null) {
+            return null;
+        }
         try {
-            IMEInventory<IAEFluidStack> inventory = node.getProxy().getStorage()
-                  .getInventory(AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class));
+            IMEInventory<IAEFluidStack> inventory = node.getInventory(channel);
             IAEFluidStack toExtract = AEFluidStack.fromFluidStack(request);
             if (toExtract == null) {
                 return null;
@@ -87,6 +94,51 @@ public final class AEUpgradeFluidBridge {
             return extracted == null ? null : extracted.getFluidStack();
         } catch (GridAccessException | RuntimeException | LinkageError ignored) {
             return null;
+        }
+    }
+
+    public static boolean hasAvailable(AEUpgradeNode node, FluidStack request) {
+        return request != null && request.getFluid() != null && request.amount > 0 && hasAvailable(node, AEFluidStack.fromFluidStack(request));
+    }
+
+    public static boolean hasAvailable(AEUpgradeNode node, @Nullable IAEFluidStack request) {
+        if (request == null || request.getStackSize() <= 0 || !node.canUseNetwork()) {
+            return false;
+        }
+        IFluidStorageChannel channel = getFluidStorageChannel();
+        if (channel == null) {
+            return false;
+        }
+        try {
+            IMEInventory<IAEFluidStack> inventory = node.getInventory(channel);
+            if (inventory instanceof IMEMonitor<?> rawMonitor) {
+                @SuppressWarnings("unchecked")
+                IMEMonitor<IAEFluidStack> monitor = (IMEMonitor<IAEFluidStack>) rawMonitor;
+                IAEFluidStack available = monitor.getStorageList().findPrecise(request);
+                return available != null && available.getStackSize() >= request.getStackSize();
+            }
+            IAEFluidStack extracted = inventory.extractItems(request.copy(), Actionable.SIMULATE, node.getActionSource());
+            return extracted != null && extracted.getStackSize() >= request.getStackSize();
+        } catch (GridAccessException | RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    @Nullable
+    private static IFluidStorageChannel getFluidStorageChannel() {
+        if (channelResolved) {
+            return fluidStorageChannel;
+        }
+        synchronized (AEUpgradeFluidBridge.class) {
+            if (!channelResolved) {
+                try {
+                    fluidStorageChannel = AEApi.instance().storage().getStorageChannel(IFluidStorageChannel.class);
+                } catch (RuntimeException | LinkageError ignored) {
+                    fluidStorageChannel = null;
+                }
+                channelResolved = true;
+            }
+            return fluidStorageChannel;
         }
     }
 }

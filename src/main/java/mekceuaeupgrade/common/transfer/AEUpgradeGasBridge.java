@@ -6,6 +6,7 @@ import mekceuaeupgrade.common.host.AEUpgradeNode;
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.storage.IMEInventory;
+import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.IStorageChannel;
 import appeng.api.storage.data.IAEStack;
 import appeng.me.GridAccessException;
@@ -98,6 +99,69 @@ public final class AEUpgradeGasBridge {
         }
     }
 
+    public static boolean hasAvailable(AEUpgradeNode node, GasStack request) {
+        if (request == null || request.getGas() == null || request.amount <= 0 || !node.canUseNetwork()) {
+            return false;
+        }
+        Bridge activeBridge = getBridge();
+        if (activeBridge == null) {
+            return false;
+        }
+        try {
+            Object aeStack = activeBridge.toAEGasStack.invoke(null, request);
+            if (!(aeStack instanceof IAEStack requested)) {
+                return false;
+            }
+            IMEInventory inventory = activeBridge.getInventory(node);
+            if (inventory instanceof IMEMonitor monitor) {
+                IAEStack available = (IAEStack) monitor.getStorageList().findPrecise(requested);
+                return available != null && available.getStackSize() >= request.amount;
+            }
+            IAEStack extracted = (IAEStack) inventory.extractItems(requested, Actionable.SIMULATE, node.getActionSource());
+            return extracted != null && extracted.getStackSize() >= request.amount;
+        } catch (GridAccessException | ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
+    @Nullable
+    public static Object createAvailabilityRequest(GasStack request) {
+        if (request == null || request.getGas() == null || request.amount <= 0) {
+            return null;
+        }
+        Bridge activeBridge = getBridge();
+        if (activeBridge == null) {
+            return null;
+        }
+        try {
+            Object aeStack = activeBridge.toAEGasStack.invoke(null, request);
+            return aeStack instanceof IAEStack ? aeStack : null;
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    public static boolean hasAvailable(AEUpgradeNode node, @Nullable Object availabilityRequest) {
+        if (!(availabilityRequest instanceof IAEStack requested) || requested.getStackSize() <= 0 || !node.canUseNetwork()) {
+            return false;
+        }
+        Bridge activeBridge = getBridge();
+        if (activeBridge == null) {
+            return false;
+        }
+        try {
+            IMEInventory inventory = activeBridge.getInventory(node);
+            if (inventory instanceof IMEMonitor monitor) {
+                IAEStack available = (IAEStack) monitor.getStorageList().findPrecise(requested);
+                return available != null && available.getStackSize() >= requested.getStackSize();
+            }
+            IAEStack extracted = (IAEStack) inventory.extractItems(requested.copy(), Actionable.SIMULATE, node.getActionSource());
+            return extracted != null && extracted.getStackSize() >= requested.getStackSize();
+        } catch (GridAccessException | RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
     /**
      * 懒加载反射桥接信息。
      *
@@ -124,7 +188,11 @@ public final class AEUpgradeGasBridge {
                 Class<?> gasStorageChannelClass = Class.forName("com.mekeng.github.common.me.storage.IGasStorageChannel", false, loader);
                 Class<?> aeGasStackClass = Class.forName("com.mekeng.github.common.me.data.impl.AEGasStack", false, loader);
                 Class<?> aeGasStackInterface = Class.forName("com.mekeng.github.common.me.data.IAEGasStack", false, loader);
-                bridge = new Bridge(gasStorageChannelClass, aeGasStackClass.getMethod("of", GasStack.class),
+                IStorageChannel channel = AEApi.instance().storage().getStorageChannel((Class) gasStorageChannelClass);
+                if (channel == null) {
+                    return null;
+                }
+                bridge = new Bridge(channel, aeGasStackClass.getMethod("of", GasStack.class),
                       aeGasStackInterface.getMethod("getGasStack"));
             } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
                 bridge = null;
@@ -138,17 +206,17 @@ public final class AEUpgradeGasBridge {
      */
     private static final class Bridge {
 
-        private final Class<?> gasStorageChannelClass;
+        private final IStorageChannel gasStorageChannel;
         private final Method toAEGasStack;
         private final Method toGasStack;
 
         /**
-         * @param gasStorageChannelClass 气体存储频道 class
+         * @param gasStorageChannel 气体存储频道
          * @param toAEGasStack GasStack 转 AEGasStack 的静态方法
          * @param toGasStack AEGasStack 转 GasStack 的实例方法
          */
-        private Bridge(Class<?> gasStorageChannelClass, Method toAEGasStack, Method toGasStack) {
-            this.gasStorageChannelClass = gasStorageChannelClass;
+        private Bridge(IStorageChannel gasStorageChannel, Method toAEGasStack, Method toGasStack) {
+            this.gasStorageChannel = gasStorageChannel;
             this.toAEGasStack = toAEGasStack;
             this.toGasStack = toGasStack;
         }
@@ -162,8 +230,7 @@ public final class AEUpgradeGasBridge {
          */
         @SuppressWarnings({"rawtypes", "unchecked"})
         private IMEInventory getInventory(AEUpgradeNode node) throws GridAccessException {
-            IStorageChannel channel = AEApi.instance().storage().getStorageChannel((Class) gasStorageChannelClass);
-            return node.getProxy().getStorage().getInventory(channel);
+            return node.getInventory(gasStorageChannel);
         }
 
         /**

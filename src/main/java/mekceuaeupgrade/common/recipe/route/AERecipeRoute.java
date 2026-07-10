@@ -58,12 +58,48 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
      */
     @Nullable
     public AEExposedRecipe toLegacyRecipe() {
-        List<ItemStack> legacyInputs = toLegacyStacks(inputs);
-        List<ItemStack> legacyOutputs = toLegacyStacks(outputs);
+        List<ItemStack> legacyInputs = toLegacyStacks(inputs, 1);
+        List<ItemStack> legacyOutputs = toLegacyStacks(outputs, 1);
         if (legacyInputs == null || legacyOutputs == null || legacyInputs.isEmpty() || legacyOutputs.isEmpty()) {
             return null;
         }
         return new AEExposedRecipe(legacyInputs, legacyOutputs, this, getRouteDiscriminator());
+    }
+
+    /**
+     * @return 该 route 在不溢出的前提下允许的最大批量倍数
+     */
+    public int getMaxCraftAmount() {
+        int max = Integer.MAX_VALUE;
+        for (AERecipeRouteStack stack : inputs) {
+            max = Math.min(max, stack.getMaxCraftAmount());
+        }
+        for (AERecipeRouteStack stack : outputs) {
+            max = Math.min(max, stack.getMaxCraftAmount());
+        }
+        return Math.max(1, max);
+    }
+
+    /**
+     * 按批量倍数生成 AE 旧物品输入栈。
+     *
+     * @param craftAmount 批量倍数
+     * @return 旧物品输入栈，无法转换时返回 null
+     */
+    @Nullable
+    public List<ItemStack> toLegacyInputStacks(int craftAmount) {
+        return toLegacyStacks(inputs, Math.max(1, Math.min(craftAmount, getMaxCraftAmount())));
+    }
+
+    /**
+     * 按批量倍数生成 AE 旧物品输出栈。
+     *
+     * @param craftAmount 批量倍数
+     * @return 旧物品输出栈，无法转换时返回 null
+     */
+    @Nullable
+    public List<ItemStack> toLegacyOutputStacks(int craftAmount) {
+        return toLegacyStacks(outputs, Math.max(1, Math.min(craftAmount, getMaxCraftAmount())));
     }
 
     /**
@@ -93,10 +129,10 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
      * @return 全部可转换时返回旧物品栈列表，否则返回 null
      */
     @Nullable
-    private static List<ItemStack> toLegacyStacks(List<AERecipeRouteStack> routeStacks) {
+    private static List<ItemStack> toLegacyStacks(List<AERecipeRouteStack> routeStacks, int craftAmount) {
         List<ItemStack> stacks = new ArrayList<>(routeStacks.size());
         for (AERecipeRouteStack routeStack : routeStacks) {
-            ItemStack stack = routeStack.toLegacyStack();
+            ItemStack stack = routeStack.toLegacyStack(craftAmount);
             if (stack.isEmpty()) {
                 return null;
             }

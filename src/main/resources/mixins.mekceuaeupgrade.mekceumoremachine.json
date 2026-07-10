@@ -11,10 +11,13 @@
     "MixinTileEntityTierChemicalCrystallizer",
     "MixinTileEntityTierChemicalDissolutionChamber",
     "MixinTileEntityTierElectrolyticSeparator",
+    "MixinTileEntityTierAmbientAccumulator",
+    "MixinTileEntityTierElectricPump",
     "MixinTileEntityTierIsotopicCentrifuge",
     "MixinTileEntityTierNutritionalLiquifier",
     "MixinTileEntityTierRotaryCondensentrator",
     "MixinTileEntityTierSolarNeutronActivator",
+    "MixinTileEntityVoidMineralGenerator",
     "MixinTileEntityReplicatorFluidStack",
     "MixinTileEntityReplicatorGases",
     "MixinTileEntityReplicatorItemStack"

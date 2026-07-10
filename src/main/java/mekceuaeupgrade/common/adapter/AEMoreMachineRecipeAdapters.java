@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 public final class AEMoreMachineRecipeAdapters {
 
@@ -121,9 +122,15 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputSlots.get(), processCount.getAsInt());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return drainGasTanks(node, outputTanks.get(), processCount.getAsInt());
             }
+
         };
     }
 
@@ -193,9 +200,15 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputTanks.get(), processCount.getAsInt());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return drainItemSlots(node, outputSlots.get(), processCount.getAsInt());
             }
+
         };
     }
 
@@ -272,9 +285,16 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputSlots.get(), processCount.getAsInt());
+                observer.accept(gasTank.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return drainGasTanks(node, outputTanks.get(), processCount.getAsInt());
             }
+
         };
     }
 
@@ -340,9 +360,16 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(gasTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainItem(node, outputSlot.get());
+            }
+
         };
     }
 
@@ -403,9 +430,16 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.gas("gas_output", outputTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputTank.get());
+                observer.accept(uuTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainGas(node, outputTank.get());
+            }
+
         };
     }
 
@@ -467,9 +501,16 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.fluid("fluid_output", outputFluidTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(gasTank.get());
+                observer.accept(inputFluidTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainFluid(node, outputFluidTank.get());
+            }
+
         };
     }
 
@@ -506,7 +547,7 @@ public final class AEMoreMachineRecipeAdapters {
                     return false;
                 }
                 AERecipeTransferPlan plan = AERecipeTransferPlan.fromLegacyInputsByPortId(recipe, stacks,
-                      Collections.singletonList(AERecipePort.gas("uu_gas", uuTank.get())));
+                      Collections.singletonList(AERecipePort.gas("uu_input", uuTank.get())));
                 if (plan == null || !plan.execute()) {
                     return AEItemRecipeAdapters.reject(host, "atomic {} UU input execute failed for {}", machineName, AEUpgradeDebug.stacks(stacks));
                 }
@@ -519,9 +560,15 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainItem(node, outputSlot.get());
+            }
+
         };
     }
 
@@ -557,7 +604,7 @@ public final class AEMoreMachineRecipeAdapters {
                     return false;
                 }
                 AERecipeTransferPlan plan = AERecipeTransferPlan.fromLegacyInputsByPortId(recipe, stacks,
-                      Collections.singletonList(AERecipePort.gas("uu_gas", uuTank.get())));
+                      Collections.singletonList(AERecipePort.gas("uu_input", uuTank.get())));
                 if (plan == null || !plan.execute()) {
                     return AEItemRecipeAdapters.reject(host, "atomic {} UU input execute failed for {}", machineName, AEUpgradeDebug.stacks(stacks));
                 }
@@ -570,9 +617,15 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.gas("gas_output", outputTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainGas(node, outputTank.get());
+            }
+
         };
     }
 
@@ -608,7 +661,7 @@ public final class AEMoreMachineRecipeAdapters {
                     return false;
                 }
                 AERecipeTransferPlan plan = AERecipeTransferPlan.fromLegacyInputsByPortId(recipe, stacks,
-                      Collections.singletonList(AERecipePort.gas("uu_gas", uuTank.get())));
+                      Collections.singletonList(AERecipePort.gas("uu_input", uuTank.get())));
                 if (plan == null || !plan.execute()) {
                     return AEItemRecipeAdapters.reject(host, "atomic {} UU input execute failed for {}", machineName, AEUpgradeDebug.stacks(stacks));
                 }
@@ -621,9 +674,15 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.fluid("fluid_output", outputTank.get()));
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
             }
+
+            @Override
+            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
+                return AERecipePort.drainFluid(node, outputTank.get());
+            }
+
         };
     }
 
@@ -879,7 +938,7 @@ public final class AEMoreMachineRecipeAdapters {
             if (MachineInput.inputContains(template, requiredTemplate) && isPositiveGas(uu) && isValidGas.test(uu.getGas()) &&
                 isPositiveItem(output)) {
                 routes.add(AERecipeRoute.builder("route:replicator_item.template")
-                      .inputGas("uu_gas", uu)
+                      .inputGas("uu_input", uu)
                       .outputItem("item_output", output)
                       .build());
             }
@@ -902,7 +961,7 @@ public final class AEMoreMachineRecipeAdapters {
             GasStack output = recipe.getOutput().output;
             if (input != null && hasGas(template, input.input) && isPositiveGas(input.uu) && isPositiveGas(output)) {
                 routes.add(AERecipeRoute.builder("route:replicator_gas.template")
-                      .inputGas("uu_gas", input.uu)
+                      .inputGas("uu_input", input.uu)
                       .outputGas("gas_output", output)
                       .build());
             }
@@ -925,7 +984,7 @@ public final class AEMoreMachineRecipeAdapters {
             FluidStack output = recipe.getOutput().output;
             if (input != null && hasFluid(template, input.ingredientFluid) && isPositiveGas(input.ingredientGas) && isPositiveFluid(output)) {
                 routes.add(AERecipeRoute.builder("route:replicator_fluid.template")
-                      .inputGas("uu_gas", input.ingredientGas)
+                      .inputGas("uu_input", input.ingredientGas)
                       .outputFluid("fluid_output", output)
                       .build());
             }
@@ -1290,9 +1349,27 @@ public final class AEMoreMachineRecipeAdapters {
         }
         boolean drained = false;
         for (int process = 0; process < processCount; process++) {
-            drained |= AERecipePort.drainAll(node, AERecipePort.gas("gas_output_" + process, getTank(tanks, process)));
+            drained |= AERecipePort.drainGas(node, getTank(tanks, process));
         }
         return drained;
+    }
+
+    private static void observeContainers(Consumer<Object> observer, @Nullable List<?> containers, int processCount) {
+        if (observer == null || containers == null) {
+            return;
+        }
+        for (int process = 0; process < processCount && process < containers.size(); process++) {
+            observer.accept(containers.get(process));
+        }
+    }
+
+    private static void observeContainers(Consumer<Object> observer, @Nullable Object[] containers, int processCount) {
+        if (observer == null || containers == null) {
+            return;
+        }
+        for (int process = 0; process < processCount && process < containers.length; process++) {
+            observer.accept(containers[process]);
+        }
     }
 
     private static boolean drainItemSlots(AEUpgradeNode node, @Nullable List<? extends IInventorySlot> slots, int processCount) {
@@ -1301,7 +1378,7 @@ public final class AEMoreMachineRecipeAdapters {
         }
         boolean drained = false;
         for (int process = 0; process < processCount; process++) {
-            drained |= AERecipePort.drainAll(node, AERecipePort.item("item_output_" + process, getSlot(slots, process)));
+            drained |= AERecipePort.drainItem(node, getSlot(slots, process));
         }
         return drained;
     }
