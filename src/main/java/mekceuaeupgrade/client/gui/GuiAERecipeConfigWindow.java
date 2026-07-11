@@ -699,6 +699,18 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         return false;
     }
 
+    private boolean hasUnmodifiableRoute(@Nullable Product product) {
+        if (product == null) {
+            return false;
+        }
+        for (Route route : product.getRoutes()) {
+            if (!route.isModifiable()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean hasAnyModifiableRoute() {
         for (Product product : snapshot.getProducts()) {
             if (hasModifiableRoute(product)) {
@@ -971,11 +983,11 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                       && mouseY < getY() + 1 + (i + 1) * elementHeight;
                 boolean modifiable = hasModifiableRoute(product);
                 drawRowSelection(relativeX + 1, y, barXShift - 2, elementHeight, selected, selectionFocus == SelectionFocus.PRODUCT, hovered);
-                if (!modifiable) {
+                if (hasUnmodifiableRoute(product)) {
                     drawLockedRouteInner(relativeX + 1, y, barXShift - 2, elementHeight);
                 }
                 int indicatorX = relativeX + barXShift - 10;
-                if (modifiable && product.hasMultipleRoutes()) {
+                if (modifiable) {
                     GuiUtils.fill(indicatorX, y + 4, indicatorX + INDICATOR_SIZE, y + 4 + INDICATOR_SIZE, getProductEnabledIndicatorColor(product));
                 }
                 if (product.hasMultipleRoutes()) {
@@ -1013,7 +1025,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
                 return;
             }
             int indicatorX = getX() + barXShift - 10;
-            if (product.hasMultipleRoutes() && mouseX >= indicatorX && mouseX < indicatorX + INDICATOR_SIZE) {
+            if (mouseX >= indicatorX && mouseX < indicatorX + INDICATOR_SIZE) {
                 int relativeMouseY = mouseY - getY() - 1;
                 int rowY = relativeMouseY % elementHeight;
                 if (hasModifiableRoute(product) && rowY >= 4 && rowY < 4 + INDICATOR_SIZE) {
@@ -1028,7 +1040,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             ItemStack hoveredStack = getHoveredScrollingStack(outputs, mouseX, mouseY, relativeX + 4, relativeY + 4 + visibleIndex * elementHeight, 18, 16);
             if (hoveredStack != null) {
                 gui().renderItemTooltip(hoveredStack, mouseX, mouseY);
-            } else if (!hasModifiableRoute(product)) {
+            } else if (hasUnmodifiableRoute(product)) {
                 displayTooltip(AELang.AE_RECIPE_CONFIG_ROUTE_SELF_REFERENTIAL.translate(), mouseX, mouseY);
             } else if (outputs.size() > 1) {
                 displayTooltips(getStackNames(outputs), mouseX, mouseY);
