@@ -15,6 +15,11 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void registerItemRenders() {
         registerItemRender(MEKCeuAEUpgradeItems.AECraftingUpgrade);
+        registerItemRender(MEKCeuAEUpgradeItems.AEOutputUpgrade);
+        registerItemRender(MEKCeuAEUpgradeItems.AEAutoProcessingUpgrade);
+        registerItemRender(MEKCeuAEUpgradeItems.AEWirelessCraftingUpgrade);
+        registerItemRender(MEKCeuAEUpgradeItems.AEWirelessAutoProcessingUpgrade);
+        registerItemRender(MEKCeuAEUpgradeItems.AEWirelessOutputUpgrade);
     }
 
     private void registerItemRender(Item item) {

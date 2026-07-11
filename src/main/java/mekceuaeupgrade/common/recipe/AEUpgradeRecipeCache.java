@@ -8,6 +8,7 @@ import mekceuaeupgrade.common.recipe.route.AERecipeRouteCollectors;
 import mekceuaeupgrade.common.transfer.AEUpgradeFluidBridge;
 
 import mekceuaeupgrade.common.config.AERecipeProfile;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekanism.api.gas.Gas;
 import mekanism.api.infuse.InfuseObject;
@@ -61,13 +62,20 @@ public class AEUpgradeRecipeCache {
 
     private final IAEUpgradeHost host;
     private final List<AEExposedRecipe> recipes = new ArrayList<>();
+    private final List<AEExposedRecipe> autoProcessingRecipes = new ArrayList<>();
     private final Random priorityRandom = new Random();
     private List<AEExposedRecipe> recipeView = Collections.unmodifiableList(recipes);
-    private int recipeVersion = -1;
+    private List<AEExposedRecipe> autoProcessingRecipeView = Collections.unmodifiableList(autoProcessingRecipes);
+    private int craftingRecipeVersion = -1;
+    private int autoProcessingRecipeVersion = -1;
     private int profileVersion = -1;
+    private int autoProcessingProfileVersion = -1;
     @Nullable
     private AERecipeProfile lastProfile;
+    @Nullable
+    private AERecipeProfile lastAutoProcessingProfile;
     private Object lastRecipeSourceKey;
+    private Object lastAutoProcessingRecipeSourceKey;
 
     public AEUpgradeRecipeCache(IAEUpgradeHost host) {
         this.host = host;
@@ -76,6 +84,11 @@ public class AEUpgradeRecipeCache {
     public List<AEExposedRecipe> getRecipes() {
         rebuildIfNeeded();
         return recipeView;
+    }
+
+    public List<AEExposedRecipe> getAutoProcessingRecipes() {
+        rebuildAutoProcessingIfNeeded();
+        return autoProcessingRecipeView;
     }
 
     public AEExposedRecipe find(AEExposedRecipeMatcher matcher) {
@@ -89,7 +102,8 @@ public class AEUpgradeRecipeCache {
     }
 
     public void invalidate() {
-        recipeVersion = -1;
+        craftingRecipeVersion = -1;
+        autoProcessingRecipeVersion = -1;
     }
 
     public static void setRecipePriorityComparator(@Nullable Comparator<AEExposedRecipe> comparator) {
@@ -100,22 +114,54 @@ public class AEUpgradeRecipeCache {
     private void rebuildIfNeeded() {
         int currentVersion = RecipeHandler.getGlobalRecipeVersion();
         Object recipeSourceKey = host instanceof IAEItemRecipeHost itemHost ? itemHost.getAERecipeSourceKey() : null;
-        AERecipeProfile profile = AERecipeProfileManager.getProfile(host);
+        AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.CRAFTING);
         int currentProfileVersion = profile == null ? -1 : profile.getVersion();
-        if (recipeVersion == currentVersion && profileVersion == currentProfileVersion && profile == lastProfile && Objects.equals(recipeSourceKey, lastRecipeSourceKey)) {
+        if (craftingRecipeVersion == currentVersion && profileVersion == currentProfileVersion && profile == lastProfile
+              && Objects.equals(recipeSourceKey, lastRecipeSourceKey)) {
             return;
         }
-        recipeVersion = currentVersion;
+        craftingRecipeVersion = currentVersion;
         profileVersion = currentProfileVersion;
         lastProfile = profile;
         lastRecipeSourceKey = recipeSourceKey;
         recipes.clear();
-        recipes.addAll(collectExposableRecipes(host));
-        assignPriorities(profile);
+        recipes.addAll(collectCraftingRecipes(host));
+        assignPriorities(recipes, profile);
         recipeView = Collections.unmodifiableList(new ArrayList<>(recipes));
     }
 
-    public static List<AEExposedRecipe> collectExposableRecipes(IAEUpgradeHost host) {
+    private void rebuildAutoProcessingIfNeeded() {
+        int currentVersion = RecipeHandler.getGlobalRecipeVersion();
+        Object recipeSourceKey = host instanceof IAEItemRecipeHost itemHost ? itemHost.getAERecipeSourceKey() : null;
+        AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.AUTO_PROCESSING);
+        int currentProfileVersion = profile == null ? -1 : profile.getVersion();
+        if (autoProcessingRecipeVersion == currentVersion
+              && autoProcessingProfileVersion == currentProfileVersion
+              && profile == lastAutoProcessingProfile
+              && Objects.equals(recipeSourceKey, lastAutoProcessingRecipeSourceKey)) {
+            return;
+        }
+        autoProcessingRecipeVersion = currentVersion;
+        autoProcessingProfileVersion = currentProfileVersion;
+        lastAutoProcessingProfile = profile;
+        lastAutoProcessingRecipeSourceKey = recipeSourceKey;
+        autoProcessingRecipes.clear();
+        if (profile != null && profile.getRouteFilterMode() == AERecipeProfile.RouteFilterMode.WHITELIST) {
+            autoProcessingRecipes.addAll(collectConfigurableRecipes(host));
+            assignPriorities(autoProcessingRecipes, profile);
+        }
+        autoProcessingRecipeView = Collections.unmodifiableList(new ArrayList<>(autoProcessingRecipes));
+    }
+
+    public static List<AEExposedRecipe> collectCraftingRecipes(IAEUpgradeHost host) {
+        List<AEExposedRecipe> recipes = collectConfigurableRecipes(host);
+        if (!recipes.isEmpty()) {
+            recipes.removeIf(recipe -> !recipe.isExposableToCrafting());
+        }
+        return recipes;
+    }
+
+    public static List<AEExposedRecipe> collectConfigurableRecipes(IAEUpgradeHost host) {
         if (!(host instanceof IAEItemRecipeHost itemHost)) {
             return Collections.emptyList();
         }
@@ -236,20 +282,21 @@ public class AEUpgradeRecipeCache {
         return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectRotaryFluidToGas(recipeMap));
     }
 
-    private void assignPriorities(@Nullable AERecipeProfile profile) {
+    private void assignPriorities(List<AEExposedRecipe> targetRecipes, @Nullable AERecipeProfile profile) {
         Comparator<AEExposedRecipe> comparator = priorityComparator;
         if (comparator == null) {
-            Collections.shuffle(recipes, priorityRandom);
+            Collections.shuffle(targetRecipes, priorityRandom);
         } else {
-            recipes.sort(comparator);
+            targetRecipes.sort(comparator);
         }
-        if (profile != null && !profile.isEmpty()) {
-            List<AEExposedRecipe> filtered = profile.applyTo(recipes, true);
-            recipes.clear();
-            recipes.addAll(filtered);
+        if (profile != null && (!profile.isEmpty()
+              || profile.getRouteFilterMode() == AERecipeProfile.RouteFilterMode.WHITELIST)) {
+            List<AEExposedRecipe> filtered = profile.applyTo(targetRecipes, true);
+            targetRecipes.clear();
+            targetRecipes.addAll(filtered);
         }
-        int priority = recipes.size();
-        for (AEExposedRecipe recipe : recipes) {
+        int priority = targetRecipes.size();
+        for (AEExposedRecipe recipe : targetRecipes) {
             recipe.setPriority(priority--);
         }
     }

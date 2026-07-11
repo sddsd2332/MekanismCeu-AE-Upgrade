@@ -9,6 +9,7 @@ import net.minecraft.item.ItemStack;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 public interface IAERecipeMachineAdapter {
 
@@ -38,6 +39,9 @@ public interface IAERecipeMachineAdapter {
 
     default boolean canAcceptAnyItemInput(IAEItemRecipeHost host) {
         return false;
+    }
+
+    default void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
     }
 
     default boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {

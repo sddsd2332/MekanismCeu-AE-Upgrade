@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -121,6 +122,11 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputSlots.get(), processCount.getAsInt());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return drainGasTanks(node, outputTanks.get(), processCount.getAsInt());
             }
@@ -190,6 +196,11 @@ public final class AEMoreMachineRecipeAdapters {
                     }
                 }
                 return false;
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputTanks.get(), processCount.getAsInt());
             }
 
             @Override
@@ -272,6 +283,12 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observeContainers(observer, inputSlots.get(), processCount.getAsInt());
+                observer.accept(gasTank.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return drainGasTanks(node, outputTanks.get(), processCount.getAsInt());
             }
@@ -340,6 +357,12 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(gasTank.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
             }
@@ -400,6 +423,12 @@ public final class AEMoreMachineRecipeAdapters {
                 }
                 RECIPE recipe = getChemicalGasRecipe(recipes, refreshRecipeLookupCache, leftGas, rightGas);
                 return recipe != null && canGasStackInsert(output, recipe.getOutput().output);
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputTank.get());
+                observer.accept(uuTank.get());
             }
 
             @Override
@@ -467,6 +496,12 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(gasTank.get());
+                observer.accept(inputFluidTank.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return AERecipePort.drainAll(node, AERecipePort.fluid("fluid_output", outputFluidTank.get()));
             }
@@ -516,6 +551,11 @@ public final class AEMoreMachineRecipeAdapters {
             @Override
             public boolean canAcceptAnyItemInput(IAEItemRecipeHost host) {
                 return canAcceptAnyReplicatorItemTemplateInput(recipes.get(), templateSlot.get(), uuTank.get(), outputSlot.get(), isValidGas);
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
             }
 
             @Override
@@ -570,6 +610,11 @@ public final class AEMoreMachineRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return AERecipePort.drainAll(node, AERecipePort.gas("gas_output", outputTank.get()));
             }
@@ -618,6 +663,11 @@ public final class AEMoreMachineRecipeAdapters {
             @Override
             public boolean canAcceptAnyItemInput(IAEItemRecipeHost host) {
                 return canAcceptAnyReplicatorFluidTemplateInput(recipes.get(), templateTank.get(), uuTank.get(), outputTank.get());
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(uuTank.get());
             }
 
             @Override
@@ -1304,6 +1354,24 @@ public final class AEMoreMachineRecipeAdapters {
             drained |= AERecipePort.drainAll(node, AERecipePort.item("item_output_" + process, getSlot(slots, process)));
         }
         return drained;
+    }
+
+    private static void observeContainers(Consumer<Object> observer, @Nullable List<?> containers, int processCount) {
+        if (observer == null || containers == null) {
+            return;
+        }
+        for (int process = 0; process < processCount && process < containers.size(); process++) {
+            observer.accept(containers.get(process));
+        }
+    }
+
+    private static void observeContainers(Consumer<Object> observer, @Nullable Object[] containers, int processCount) {
+        if (observer == null || containers == null) {
+            return;
+        }
+        for (int process = 0; process < processCount && process < containers.length; process++) {
+            observer.accept(containers[process]);
+        }
     }
 
     @Nullable

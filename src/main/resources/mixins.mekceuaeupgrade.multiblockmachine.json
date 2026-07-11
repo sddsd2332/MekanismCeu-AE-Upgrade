@@ -2,7 +2,6 @@
   "required": true,
   "package": "mekceuaeupgrade.mixin.multiblockmachine",
   "plugin": "mekceuaeupgrade.mixin.MEKCeuAEUpgradeMixin",
-  "refmap": "mixins.mekceuaeupgrade.refmap.json",
   "target": "@env(MOD)",
   "minVersion": "0.8.7",
   "compatibilityLevel": "JAVA_25",

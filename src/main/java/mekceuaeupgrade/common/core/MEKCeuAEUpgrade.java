@@ -28,9 +28,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = MEKCeuAEUpgrade.MODID, useMetadata = true, dependencies = "required-after:mekanism;required-after:ae2;required-after:mekeng", customProperties = {
-      @Mod.CustomProperty(k = "license", v = "MIT")
-})
+@Mod(modid = MEKCeuAEUpgrade.MODID, version = Reference.VERSION, useMetadata = true, dependencies = "required-after:mekanism;required-after:ae2;required-after:mekeng")
 @Mod.EventBusSubscriber
 public class MEKCeuAEUpgrade implements IModule {
 

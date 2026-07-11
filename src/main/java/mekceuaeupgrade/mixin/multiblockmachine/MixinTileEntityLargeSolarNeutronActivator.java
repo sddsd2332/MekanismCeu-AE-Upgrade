@@ -72,11 +72,6 @@ public abstract class MixinTileEntityLargeSolarNeutronActivator implements IAERe
         }
     }
 
-    @Inject(method = "addTileSyncTask", at = @At("HEAD"))
-    private void mekceuaeupgrade$addTileSyncTask(CallbackInfo ci) {
-        mekceuaeupgrade$tickAEUpgradeServer();
-    }
-
     @Inject(method = "onRecipeCacheInvalidated", at = @At("TAIL"))
     private void mekceuaeupgrade$onRecipeCacheInvalidated(int cacheIndex, CallbackInfo ci) {
         mekceuaeupgrade$invalidateAERecipeCache();

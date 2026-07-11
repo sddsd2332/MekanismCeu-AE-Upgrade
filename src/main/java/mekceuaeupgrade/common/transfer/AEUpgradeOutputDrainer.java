@@ -31,25 +31,39 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了物品
      */
     public static boolean drainItemSlot(AEUpgradeNode node, IInventorySlot slot) {
-        if (slot == null || !node.canUseNetwork()) {
+        return drainItemSlot(node, slot, AutomationType.INTERNAL);
+    }
+
+    public static boolean drainItemSlot(AEUpgradeNode node, IInventorySlot slot, AutomationType automationType) {
+        if (slot == null || automationType == null) {
             return false;
         }
+        node.observeOutputContainer(slot);
         ItemStack stored = slot.getStack();
         if (stored.isEmpty()) {
+            return false;
+        }
+        if (!node.canUseNetwork()) {
+            node.markOutputBlocked();
             return false;
         }
         ItemStack remainder = node.injectItem(stored.copy(), Actionable.SIMULATE);
         int accepted = stored.getCount() - (remainder.isEmpty() ? 0 : remainder.getCount());
         if (accepted <= 0) {
+            node.markOutputBlocked();
             return false;
         }
-        ItemStack extracted = slot.extractItem(accepted, Action.EXECUTE, AutomationType.INTERNAL);
+        ItemStack extracted = slot.extractItem(accepted, Action.EXECUTE, automationType);
         if (extracted.isEmpty()) {
+            node.markOutputBlocked();
             return false;
         }
         ItemStack finalRemainder = node.injectItem(extracted, Actionable.MODULATE);
         if (!finalRemainder.isEmpty()) {
             slot.insertItem(finalRemainder, Action.EXECUTE, AutomationType.INTERNAL);
+        }
+        if (!finalRemainder.isEmpty() || !slot.getStack().isEmpty()) {
+            node.markOutputBlocked();
         }
         return true;
     }
@@ -62,25 +76,37 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了气体
      */
     public static boolean drainGasTank(AEUpgradeNode node, IExtendedGasTank tank) {
-        if (tank == null || !node.canUseNetwork() || !AEUpgradeGasBridge.isAvailable()) {
+        if (tank == null) {
             return false;
         }
+        node.observeOutputContainer(tank);
         GasStack stored = tank.getGas();
         if (stored == null || stored.getGas() == null || stored.amount <= 0) {
+            return false;
+        }
+        if (!node.canUseNetwork() || !AEUpgradeGasBridge.isAvailable()) {
+            node.markOutputBlocked();
             return false;
         }
         GasStack remainder = node.injectGas(stored.copy(), Actionable.SIMULATE);
         int accepted = stored.amount - (remainder == null ? 0 : remainder.amount);
         if (accepted <= 0) {
+            node.markOutputBlocked();
             return false;
         }
         GasStack extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
         if (extracted == null || extracted.amount <= 0) {
+            node.markOutputBlocked();
             return false;
         }
         GasStack finalRemainder = node.injectGas(extracted, Actionable.MODULATE);
         if (finalRemainder != null && finalRemainder.amount > 0) {
             tank.insert(finalRemainder, Action.EXECUTE, AutomationType.INTERNAL);
+        }
+        GasStack remaining = tank.getGas();
+        if ((finalRemainder != null && finalRemainder.amount > 0)
+              || (remaining != null && remaining.amount > 0)) {
+            node.markOutputBlocked();
         }
         return true;
     }
@@ -93,25 +119,37 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了流体
      */
     public static boolean drainFluidTank(AEUpgradeNode node, IExtendedFluidTank tank) {
-        if (tank == null || !node.canUseNetwork() || !AEUpgradeFluidBridge.isAvailable()) {
+        if (tank == null) {
             return false;
         }
+        node.observeOutputContainer(tank);
         FluidStack stored = tank.getFluid();
         if (stored == null || stored.getFluid() == null || stored.amount <= 0) {
+            return false;
+        }
+        if (!node.canUseNetwork() || !AEUpgradeFluidBridge.isAvailable()) {
+            node.markOutputBlocked();
             return false;
         }
         FluidStack remainder = node.injectFluid(stored.copy(), Actionable.SIMULATE);
         int accepted = stored.amount - (remainder == null ? 0 : remainder.amount);
         if (accepted <= 0) {
+            node.markOutputBlocked();
             return false;
         }
         FluidStack extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
         if (extracted == null || extracted.amount <= 0) {
+            node.markOutputBlocked();
             return false;
         }
         FluidStack finalRemainder = node.injectFluid(extracted, Actionable.MODULATE);
         if (finalRemainder != null && finalRemainder.amount > 0) {
             tank.insert(finalRemainder, Action.EXECUTE, AutomationType.INTERNAL);
+        }
+        FluidStack remaining = tank.getFluid();
+        if ((finalRemainder != null && finalRemainder.amount > 0)
+              || (remaining != null && remaining.amount > 0)) {
+            node.markOutputBlocked();
         }
         return true;
     }

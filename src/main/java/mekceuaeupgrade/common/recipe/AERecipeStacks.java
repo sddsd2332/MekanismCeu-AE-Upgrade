@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.recipe;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import ae2.api.stacks.GenericStack;
 import net.minecraft.item.ItemStack;
 

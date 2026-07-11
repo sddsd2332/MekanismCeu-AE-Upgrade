@@ -29,6 +29,7 @@ import net.minecraftforge.items.ItemHandlerHelper;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public final class AEItemRecipeAdapters {
@@ -64,7 +65,7 @@ public final class AEItemRecipeAdapters {
                     return reject(host, "AE supplied an empty input stack");
                 }
                 if (!recipe.matchesInput(stack)) {
-                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.stack(recipe.getInputStack()));
+                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.inputStack(recipe));
                 }
                 ItemStack simulatedInput = getSimulatedStackWithInsert(input, stack);
                 RECIPE machineRecipe = getRecipe(recipes, refreshRecipeLookupCache, simulatedInput);
@@ -78,7 +79,7 @@ public final class AEItemRecipeAdapters {
                 ItemStack machineOutput = machineRecipe.getOutput().output;
                 if (!outputsMatch(recipe, machineOutput)) {
                     return reject(host, "machine output {} does not match exposed output {}",
-                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.stack(recipe.getOutputStack()));
+                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.outputStack(recipe));
                 }
                 if (!canOutputToSlot(output, machineOutput)) {
                     return reject(host, "output slot cannot accept {}", AEUpgradeDebug.stack(machineOutput));
@@ -118,6 +119,11 @@ public final class AEItemRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()));
             }
@@ -154,7 +160,7 @@ public final class AEItemRecipeAdapters {
                     return reject(host, "AE supplied an empty input stack");
                 }
                 if (!recipe.matchesInput(stack)) {
-                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.stack(recipe.getInputStack()));
+                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.inputStack(recipe));
                 }
                 ItemStack simulatedInput = getSimulatedStackWithInsert(input, stack);
                 RECIPE machineRecipe = getChanceRecipe(recipes, refreshRecipeLookupCache, simulatedInput);
@@ -169,7 +175,7 @@ public final class AEItemRecipeAdapters {
                 ItemStack primaryOutput = machineOutput.getMainOutput();
                 if (!outputsMatch(recipe, primaryOutput)) {
                     return reject(host, "machine output {} does not match exposed output {}",
-                          AEUpgradeDebug.stack(primaryOutput), AEUpgradeDebug.stack(recipe.getOutputStack()));
+                          AEUpgradeDebug.stack(primaryOutput), AEUpgradeDebug.outputStack(recipe));
                 }
                 if (!canOutputToSlot(output, primaryOutput)) {
                     return reject(host, "primary output slot cannot accept {}", AEUpgradeDebug.stack(primaryOutput));
@@ -219,6 +225,11 @@ public final class AEItemRecipeAdapters {
             }
 
             @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+            }
+
+            @Override
             public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
                 return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()),
                       AERecipePort.item("secondary_item_output", secondaryOutputSlot.get()));
@@ -254,7 +265,7 @@ public final class AEItemRecipeAdapters {
                     return reject(host, "AE supplied an empty input stack");
                 }
                 if (!recipe.matchesInput(stack)) {
-                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.stack(recipe.getInputStack()));
+                    return reject(host, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack), AEUpgradeDebug.inputStack(recipe));
                 }
                 ItemStack simulatedInput = getSimulatedStackWithInsert(input, stack);
                 RECIPE machineRecipe = getChance2Recipe(recipes, refreshRecipeLookupCache, simulatedInput);
@@ -271,7 +282,7 @@ public final class AEItemRecipeAdapters {
                 ItemStack machineOutput = machineRecipe.getOutput().getMaxPrimaryOutput();
                 if (!outputsMatch(recipe, machineOutput)) {
                     return reject(host, "machine output {} does not match exposed output {}",
-                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.stack(recipe.getOutputStack()));
+                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.outputStack(recipe));
                 }
                 if (!canOutputToSlot(output, machineOutput)) {
                     return reject(host, "output slot cannot accept {}", AEUpgradeDebug.stack(machineOutput));
@@ -309,6 +320,11 @@ public final class AEItemRecipeAdapters {
                 RECIPE recipe = getChance2Recipe(recipes, refreshRecipeLookupCache, current);
                 return recipe != null && recipe.getOutput().primaryChance >= 1 && canOutputToSlot(output, recipe.getOutput().getMaxPrimaryOutput()) &&
                       hasInputRoom(input, current);
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
             }
 
             @Override
@@ -374,7 +390,7 @@ public final class AEItemRecipeAdapters {
                 ItemStack machineOutput = machineRecipe.getOutput().output;
                 if (!outputsMatch(recipe, machineOutput)) {
                     return reject(host, "machine output {} does not match exposed output {}",
-                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.stack(recipe.getOutputStack()));
+                          AEUpgradeDebug.stack(machineOutput), AEUpgradeDebug.outputStack(recipe));
                 }
                 if (!canOutputToSlot(output, machineOutput)) {
                     return reject(host, "output slot cannot accept {}", AEUpgradeDebug.stack(machineOutput));
@@ -421,6 +437,12 @@ public final class AEItemRecipeAdapters {
                 RECIPE recipe = getDoubleRecipe(recipes, refreshRecipeLookupCache, currentInput, currentExtra);
                 return recipe != null && canOutputToSlot(output, recipe.getOutput().output) &&
                       hasInputRoom(input, currentInput) && hasInputRoom(extra, currentExtra);
+            }
+
+            @Override
+            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+                observer.accept(inputSlot.get());
+                observer.accept(extraSlot.get());
             }
 
             @Override
@@ -514,8 +536,45 @@ public final class AEItemRecipeAdapters {
         return scaledCount <= Integer.MAX_VALUE && expected.getCount() == (int) scaledCount && ItemHandlerHelper.canItemStacksStack(expected, actual);
     }
 
+    public static boolean reject(IAEItemRecipeHost host, String reason) {
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason);
+        }
+        return false;
+    }
+
+    public static boolean reject(IAEItemRecipeHost host, String reason, Object arg0) {
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, arg0);
+        }
+        return false;
+    }
+
+    public static boolean reject(IAEItemRecipeHost host, String reason, Object arg0, Object arg1) {
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, arg0, arg1);
+        }
+        return false;
+    }
+
+    public static boolean reject(IAEItemRecipeHost host, String reason, Object arg0, Object arg1, Object arg2) {
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, arg0, arg1, arg2);
+        }
+        return false;
+    }
+
+    public static boolean reject(IAEItemRecipeHost host, String reason, Object arg0, Object arg1, Object arg2, Object arg3) {
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, arg0, arg1, arg2, arg3);
+        }
+        return false;
+    }
+
     public static boolean reject(IAEItemRecipeHost host, String reason, Object... args) {
-        AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, args);
+        if (AEUpgradeDebug.enabled()) {
+            AEUpgradeDebug.log(host, "rejecting AE item input: " + reason, args);
+        }
         return false;
     }
 }

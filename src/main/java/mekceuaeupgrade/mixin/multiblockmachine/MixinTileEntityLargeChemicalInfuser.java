@@ -66,11 +66,6 @@ public abstract class MixinTileEntityLargeChemicalInfuser extends TileEntityBasi
         return mekceuaeupgrade$aeRecipeAdapter;
     }
 
-    @Inject(method = "addTileSyncTask", at = @At("HEAD"))
-    private void mekceuaeupgrade$addTileSyncTask(CallbackInfo ci) {
-        mekceuaeupgrade$tickAEUpgradeServer();
-    }
-
     @Inject(method = "getConfigurationData", at = @At("RETURN"), cancellable = true)
     private void mekceuaeupgrade$getConfigurationData(NBTTagCompound nbtTags, CallbackInfoReturnable<NBTTagCompound> cir) {
         cir.setReturnValue(AERecipeProfileManager.writeConfigCardData((net.minecraft.tileentity.TileEntity) (Object) this, cir.getReturnValue()));

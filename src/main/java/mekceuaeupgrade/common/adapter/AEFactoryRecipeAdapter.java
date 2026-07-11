@@ -56,9 +56,11 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
 
@@ -112,96 +114,29 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
     @Override
     public boolean canAcceptItemInput(IAEItemRecipeHost host, AEExposedRecipe recipe, ItemStack stack) {
         IAEFactoryRecipeHost factory = asFactory(host);
-        return factory != null && findAEInputProcess(factory, recipe, stack) != null;
+        AERecipeTransferPlan plan = factory == null ? null : createFactoryInputPlan(factory, recipe, Collections.singletonList(stack));
+        return plan != null && plan.canExecute();
     }
 
     @Override
     public boolean acceptItemInput(IAEItemRecipeHost host, AEExposedRecipe recipe, ItemStack stack) {
         IAEFactoryRecipeHost factory = asFactory(host);
-        if (factory == null) {
-            return false;
-        }
-        IAEFactoryRecipeHost.ProcessView processInfo = findAEInputProcess(factory, recipe, stack);
-        if (processInfo == null) {
-            return false;
-        }
-        if (!AERecipeTransferPlan.create()
-              .add(AERecipePort.item("item_input", processInfo.inputSlot()), AERecipeRouteStack.item("item_input", stack))
-              .execute()) {
-            return rejectAEItemInput(factory, "input slot {} execute failed for {}", processInfo.process(), AEUpgradeDebug.stack(stack));
-        }
-        return true;
+        AERecipeTransferPlan plan = factory == null ? null : createFactoryInputPlan(factory, recipe, Collections.singletonList(stack));
+        return plan != null && plan.execute();
     }
 
     @Override
     public boolean canAcceptItemInputs(IAEItemRecipeHost host, AEExposedRecipe recipe, List<ItemStack> stacks) {
         IAEFactoryRecipeHost factory = asFactory(host);
-        if (factory == null) {
-            return false;
-        }
-        if (isAEPressurizedRecipeType(factory)) {
-            return findAEPressurizedInputProcess(factory, recipe, stacks) != null;
-        }
-        if (stacks.size() == 1) {
-            return canAcceptItemInput(host, recipe, stacks.get(0));
-        }
-        return findAEDoubleInputProcess(factory, recipe, stacks) != null;
+        AERecipeTransferPlan plan = factory == null ? null : createFactoryInputPlan(factory, recipe, stacks);
+        return plan != null && plan.canExecute();
     }
 
     @Override
     public boolean acceptItemInputs(IAEItemRecipeHost host, AEExposedRecipe recipe, List<ItemStack> stacks) {
         IAEFactoryRecipeHost factory = asFactory(host);
-        if (factory == null) {
-            return false;
-        }
-        if (isAEPressurizedRecipeType(factory)) {
-            IAEFactoryRecipeHost.ProcessView processInfo = findAEPressurizedInputProcess(factory, recipe, stacks);
-            if (processInfo == null) {
-                return false;
-            }
-            BasicFluidTank fluidTank = factory.getAEFactoryFluidTank();
-            BasicGasTank gasTank = factory.getAEFactoryGasTank();
-            if (fluidTank == null || gasTank == null) {
-                return false;
-            }
-            AERecipeTransferPlan plan = AERecipeTransferPlan.fromLegacyInputsByPortId(recipe, stacks,
-                  Arrays.asList(AERecipePort.item("item_input", processInfo.inputSlot()), AERecipePort.fluid("fluid_input", fluidTank),
-                        AERecipePort.gas("gas_input", gasTank)));
-            if (plan == null || !plan.execute()) {
-                return rejectAEItemInput(factory, "atomic pressurized input execute failed for process {} and {}",
-                      processInfo.process(), AEUpgradeDebug.stacks(stacks));
-            }
-            return true;
-        }
-        if (stacks.size() == 1) {
-            return acceptItemInput(host, recipe, stacks.get(0));
-        }
-        IAEFactoryRecipeHost.ProcessView processInfo = findAEDoubleInputProcess(factory, recipe, stacks);
-        if (processInfo == null) {
-            return false;
-        }
-        GasStack fakeGasInput = getAEFakeGasInput(factory, stacks.get(1));
-        if (isAEDirectGasInputRecipeType(factory) && fakeGasInput != null) {
-            BasicGasTank gasTank = factory.getAEFactoryGasTank();
-            AERecipeTransferPlan plan = AERecipeTransferPlan.fromLegacyInputsByPortId(recipe, stacks,
-                  Arrays.asList(AERecipePort.item("item_input", processInfo.inputSlot()), AERecipePort.gas("gas_input", gasTank)));
-            if (gasTank == null || plan == null || !plan.execute()) {
-                return rejectAEItemInput(factory, "atomic generic gas input execute failed for process {} and {}",
-                      processInfo.process(), AEUpgradeDebug.stacks(stacks));
-            }
-            return true;
-        }
-        BasicInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
-        if (extraSlot == null) {
-            return false;
-        }
-        if (!AERecipeTransferPlan.create()
-              .add(AERecipePort.item("item_input", processInfo.inputSlot()), AERecipeRouteStack.item("item_input", stacks.get(0)))
-              .add(AERecipePort.item("extra_input", extraSlot), AERecipeRouteStack.item("extra_input", stacks.get(1)))
-              .execute()) {
-            return rejectAEItemInput(factory, "atomic input execute failed for process {} and {}", processInfo.process(), AEUpgradeDebug.stacks(stacks));
-        }
-        return true;
+        AERecipeTransferPlan plan = factory == null ? null : createFactoryInputPlan(factory, recipe, stacks);
+        return plan != null && plan.execute();
     }
 
     @Override
@@ -230,6 +165,25 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
     }
 
     @Override
+    public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+        IAEFactoryRecipeHost factory = asFactory(host);
+        if (factory == null || observer == null) {
+            return;
+        }
+        IAEFactoryRecipeHost.ProcessView[] processes = factory.getAEFactoryProcesses();
+        if (processes != null) {
+            for (IAEFactoryRecipeHost.ProcessView process : processes) {
+                if (process != null) {
+                    observer.accept(process.inputSlot());
+                }
+            }
+        }
+        observer.accept(factory.getAEFactoryExtraSlot());
+        observer.accept(factory.getAEFactoryGasTank());
+        observer.accept(factory.getAEFactoryFluidTank());
+    }
+
+    @Override
     public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
         IAEFactoryRecipeHost factory = asFactory(host);
         if (factory == null || factory.getAEFactoryProcesses() == null) {
@@ -244,6 +198,282 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             drained |= AERecipePort.drainAll(node, AERecipePort.gas("gas_output", factory.getAEFactoryGasOutputTank()));
         }
         return drained;
+    }
+
+    @Nullable
+    private AERecipeTransferPlan createFactoryInputPlan(IAEFactoryRecipeHost factory, AEExposedRecipe exposedRecipe, List<ItemStack> stacks) {
+        if (exposedRecipe == null || stacks == null || stacks.isEmpty()
+              || !supportsAEItemRecipeType(factory) || !AERecipeRouteLegacyIO.matchesInputs(exposedRecipe, stacks)) {
+            return null;
+        }
+        FactoryBatch batch = resolveFactoryBatch(factory, exposedRecipe, stacks);
+        if (batch == null) {
+            return null;
+        }
+        List<ProcessAllocation> allocations = allocateFactoryProcesses(factory, batch);
+        if (allocations == null) {
+            return rejectAEItemInputPlan(factory, "factory process slots cannot accept complete batch of {} operations", batch.operations);
+        }
+        AERecipeTransferPlan plan = AERecipeTransferPlan.create();
+        for (ProcessAllocation allocation : allocations) {
+            if (allocation.operations <= 0) {
+                continue;
+            }
+            ItemStack portion = scaledStack(batch.inputPerOperation, allocation.operations);
+            if (portion.isEmpty()) {
+                return rejectAEItemInputPlan(factory, "factory primary input portion overflowed for process {}", allocation.process.process());
+            }
+            String portId = "item_input_" + allocation.process.process();
+            plan.add(AERecipePort.item(portId, allocation.process.inputSlot()), AERecipeRouteStack.item(portId, portion));
+        }
+        for (SharedTransfer shared : batch.sharedInputs) {
+            plan.add(shared.port, shared.stack);
+        }
+        return plan;
+    }
+
+    @Nullable
+    private FactoryBatch resolveFactoryBatch(IAEFactoryRecipeHost factory, AEExposedRecipe exposedRecipe, List<ItemStack> stacks) {
+        RecipeType type = factory.getAEFactoryRecipeType();
+        if (isAEPressurizedRecipeType(factory)) {
+            return resolvePressurizedBatch(factory, exposedRecipe, stacks);
+        }
+        if (stacks.get(0).isEmpty()) {
+            return null;
+        }
+        ItemStack primaryInput = stacks.get(0);
+        MachineRecipe<?, ?, ?> machineRecipe;
+        List<SharedTransfer> sharedInputs = new ArrayList<>();
+        if (type == RecipeType.INFUSING) {
+            if (stacks.size() != 2) {
+                return null;
+            }
+            machineRecipe = findInfusionBatchRecipe(factory, exposedRecipe, primaryInput, stacks.get(1));
+            BasicInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
+            if (machineRecipe == null || extraSlot == null) {
+                return null;
+            }
+            sharedInputs.add(new SharedTransfer(AERecipePort.item("extra_input", extraSlot),
+                  AERecipeRouteStack.item("extra_input", stacks.get(1))));
+        } else if (isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory)
+              || isAENucleosynthesizerGasItemRecipeType(factory)) {
+            if (stacks.size() != 2) {
+                return null;
+            }
+            GasStack gasInput = AERecipeRouteLegacyIO.getGasInput(exposedRecipe, stacks, 1, factory::isAEFactoryInputGasValid);
+            if (gasInput == null || gasInput.getGas() == null || gasInput.amount <= 0) {
+                return null;
+            }
+            if (isAENucleosynthesizerGasItemRecipeType(factory)) {
+                machineRecipe = RecipeHandler.getNucleosynthesizerRecipe(new NucleosynthesizerInput(primaryInput.copy(), gasInput.copy()));
+            } else {
+                machineRecipe = factory.getAEFactoryRecipe(new AdvancedMachineInput(primaryInput.copy(), gasInput.getGas()));
+            }
+            if (machineRecipe == null || !addFactoryGasSharedInput(factory, stacks.get(1), gasInput, sharedInputs)) {
+                return null;
+            }
+        } else if (type == RecipeType.COMBINING || type == RecipeType.AllOY) {
+            if (stacks.size() != 2) {
+                return null;
+            }
+            machineRecipe = factory.getAEFactoryRecipe(new DoubleMachineInput(primaryInput.copy(), stacks.get(1).copy()));
+            BasicInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
+            if (machineRecipe == null || extraSlot == null) {
+                return null;
+            }
+            sharedInputs.add(new SharedTransfer(AERecipePort.item("extra_input", extraSlot),
+                  AERecipeRouteStack.item("extra_input", stacks.get(1))));
+        } else {
+            if (stacks.size() != 1) {
+                return null;
+            }
+            machineRecipe = factory.getAEFactoryRecipe(new ItemStackInput(primaryInput.copy()));
+        }
+        if (machineRecipe == null || !isAERecipeSafe(machineRecipe) || !factory.isAEFactoryRecipeCurrent(machineRecipe)) {
+            return null;
+        }
+        ItemStack inputPerOperation = getRecipeInput(machineRecipe);
+        int operations = getItemOperations(inputPerOperation, primaryInput);
+        if (operations <= 0 || !validateFactoryBatchInputs(factory, machineRecipe, stacks, exposedRecipe, operations)) {
+            return null;
+        }
+        ItemStack primaryOutput = getAEPrimaryRecipeOutput(factory, machineRecipe);
+        ItemStack totalPrimaryOutput = scaledStack(primaryOutput, operations);
+        if (primaryOutput.isEmpty() || totalPrimaryOutput.isEmpty() || exposedRecipe.getOutputStacks().size() != 1
+              || !outputsMatch(exposedRecipe.getOutputStack(), totalPrimaryOutput)) {
+            return null;
+        }
+        ItemStack concreteInput = concreteInputPerOperation(primaryInput, inputPerOperation);
+        return concreteInput.isEmpty() ? null : new FactoryBatch(machineRecipe, concreteInput, operations, sharedInputs, null);
+    }
+
+    @Nullable
+    private FactoryBatch resolvePressurizedBatch(IAEFactoryRecipeHost factory, AEExposedRecipe exposedRecipe, List<ItemStack> stacks) {
+        if (stacks.size() != 3 || !AEUpgradeFakeFluid.isAvailable() || !AEUpgradeFakeGas.isAvailable()) {
+            return null;
+        }
+        BasicFluidTank fluidTank = factory.getAEFactoryFluidTank();
+        BasicGasTank gasTank = factory.getAEFactoryGasTank();
+        if (fluidTank == null || gasTank == null || factory.getAEFactoryGasOutputTank() == null) {
+            return null;
+        }
+        ItemStack primaryInput = stacks.get(0);
+        FluidStack fluidInput = AERecipeRouteLegacyIO.getFluidInput(exposedRecipe, stacks, 1);
+        GasStack gasInput = AERecipeRouteLegacyIO.getGasInput(exposedRecipe, stacks, 2, factory::isAEFactoryInputGasValid);
+        PressurizedRecipe machineRecipe = getAEPressurizedRecipe(primaryInput, fluidInput, gasInput);
+        if (machineRecipe == null || fluidInput == null || gasInput == null || !factory.isAEFactoryRecipeCurrent(machineRecipe)) {
+            return null;
+        }
+        int operations = getAEPressurizedOperations(machineRecipe.getInput(), primaryInput, fluidInput, gasInput);
+        if (operations <= 0 || !outputsMatch(exposedRecipe, machineRecipe.getOutput(), operations)) {
+            return null;
+        }
+        List<SharedTransfer> sharedInputs = new ArrayList<>();
+        sharedInputs.add(new SharedTransfer(AERecipePort.fluid("fluid_input", fluidTank),
+              AERecipeRouteStack.fluid("fluid_input", fluidInput)));
+        sharedInputs.add(new SharedTransfer(AERecipePort.gas("gas_input", gasTank),
+              AERecipeRouteStack.gas("gas_input", gasInput)));
+        ItemStack concreteInput = concreteInputPerOperation(primaryInput, machineRecipe.getInput().getSolid());
+        return concreteInput.isEmpty() ? null : new FactoryBatch(machineRecipe, concreteInput, operations, sharedInputs, machineRecipe.getOutput());
+    }
+
+    private boolean addFactoryGasSharedInput(IAEFactoryRecipeHost factory, ItemStack legacyInput, GasStack gasInput,
+          List<SharedTransfer> sharedInputs) {
+        BasicGasTank gasTank = factory.getAEFactoryGasTank();
+        if (gasTank == null || !canAEGasTankAccept(gasTank, gasInput)) {
+            return false;
+        }
+        GasStack fakeGasInput = getAEFakeGasInput(factory, legacyInput);
+        if (fakeGasInput != null) {
+            sharedInputs.add(new SharedTransfer(AERecipePort.gas("gas_input", gasTank),
+                  AERecipeRouteStack.gas("gas_input", gasInput)));
+            return true;
+        }
+        BasicInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
+        if (extraSlot == null) {
+            return false;
+        }
+        sharedInputs.add(new SharedTransfer(AERecipePort.item("extra_input", extraSlot),
+              AERecipeRouteStack.item("extra_input", legacyInput)));
+        return true;
+    }
+
+    @Nullable
+    private MetallurgicInfuserRecipe findInfusionBatchRecipe(IAEFactoryRecipeHost factory, AEExposedRecipe exposedRecipe,
+          ItemStack primaryInput, ItemStack extraInput) {
+        InfuseObject object = InfuseRegistry.getObject(extraInput);
+        if (object == null || !factory.getAEFactoryInfuseStorage().canReceive(object)) {
+            return null;
+        }
+        InfuseStorage simulatedInfuse = getSimulatedInfuseStorage(factory, object, extraInput.getCount());
+        return simulatedInfuse == null ? null : findMatchingAEInfusionRecipe(factory, exposedRecipe, primaryInput, simulatedInfuse);
+    }
+
+    private boolean validateFactoryBatchInputs(IAEFactoryRecipeHost factory, MachineRecipe<?, ?, ?> machineRecipe, List<ItemStack> stacks,
+          AEExposedRecipe exposedRecipe, int operations) {
+        RecipeType type = factory.getAEFactoryRecipeType();
+        if (type == RecipeType.COMBINING || type == RecipeType.AllOY) {
+            ItemStack extraPerOperation = getRecipeExtraInput(machineRecipe);
+            return stacks.size() == 2 && getItemOperations(extraPerOperation, stacks.get(1)) == operations;
+        }
+        if (type == RecipeType.INFUSING) {
+            if (!(machineRecipe instanceof MetallurgicInfuserRecipe infuserRecipe) || stacks.size() != 2) {
+                return false;
+            }
+            InfuseObject object = InfuseRegistry.getObject(stacks.get(1));
+            if (object == null || object.type != infuserRecipe.getInput().infuse.getType()) {
+                return false;
+            }
+            long provided = (long) object.stored * stacks.get(1).getCount();
+            long required = (long) infuserRecipe.getInput().infuse.getAmount() * operations;
+            return provided == required;
+        }
+        if (isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory)) {
+            GasStack gasInput = AERecipeRouteLegacyIO.getGasInput(exposedRecipe, stacks, 1, factory::isAEFactoryInputGasValid);
+            long required = (long) factory.getAEFactoryGasUsagePerOperation() * operations;
+            return gasInput != null && gasInput.getGas() != null && gasInput.amount == required;
+        }
+        if (isAENucleosynthesizerGasItemRecipeType(factory)) {
+            if (!(machineRecipe instanceof NucleosynthesizerRecipe nucleosynthesizerRecipe)) {
+                return false;
+            }
+            GasStack gasInput = AERecipeRouteLegacyIO.getGasInput(exposedRecipe, stacks, 1, factory::isAEFactoryInputGasValid);
+            GasStack requiredGas = nucleosynthesizerRecipe.getInput().getGas();
+            return gasInput != null && requiredGas != null && gasInput.isGasEqual(requiredGas)
+                  && (long) requiredGas.amount * operations == gasInput.amount;
+        }
+        return stacks.size() == 1;
+    }
+
+    private int getItemOperations(ItemStack required, ItemStack provided) {
+        if (required.isEmpty() || provided.isEmpty() || !MachineInput.inputContains(provided, required)) {
+            return -1;
+        }
+        return getSingleOperations(required.getCount(), provided.getCount());
+    }
+
+    private ItemStack concreteInputPerOperation(ItemStack provided, ItemStack required) {
+        if (getItemOperations(required, provided) <= 0) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack concrete = provided.copy();
+        concrete.setCount(required.getCount());
+        return concrete;
+    }
+
+    @Nullable
+    private List<ProcessAllocation> allocateFactoryProcesses(IAEFactoryRecipeHost factory, FactoryBatch batch) {
+        IAEFactoryRecipeHost.ProcessView[] processes = factory.getAEFactoryProcesses();
+        if (processes == null || processes.length == 0) {
+            return null;
+        }
+        List<ProcessAllocation> allocations = new ArrayList<>();
+        long totalCapacity = 0;
+        for (IAEFactoryRecipeHost.ProcessView process : processes) {
+            int capacity = getFactoryProcessCapacity(factory, batch, process);
+            if (capacity > 0) {
+                allocations.add(new ProcessAllocation(process, capacity));
+                totalCapacity += capacity;
+            }
+        }
+        if (totalCapacity < batch.operations) {
+            return null;
+        }
+        allocations.sort((left, right) -> {
+            int byCapacity = Integer.compare(left.capacity, right.capacity);
+            return byCapacity == 0 ? Integer.compare(left.process.process(), right.process.process()) : byCapacity;
+        });
+        int remaining = batch.operations;
+        for (int i = 0; i < allocations.size(); i++) {
+            ProcessAllocation allocation = allocations.get(i);
+            int remainingSlots = allocations.size() - i;
+            int fairShare = (int) (((long) remaining + remainingSlots - 1) / remainingSlots);
+            allocation.operations = Math.min(allocation.capacity, fairShare);
+            remaining -= allocation.operations;
+        }
+        return remaining == 0 ? allocations : null;
+    }
+
+    private int getFactoryProcessCapacity(IAEFactoryRecipeHost factory, FactoryBatch batch, IAEFactoryRecipeHost.ProcessView process) {
+        BasicInventorySlot inputSlot = process.inputSlot();
+        ItemStack current = inputSlot.getStack();
+        if (!current.isEmpty() && !ItemHandlerHelper.canItemStacksStack(current, batch.inputPerOperation)) {
+            return 0;
+        }
+        ItemStack remainder = inputSlot.insertItem(batch.inputPerOperation.copy(), Action.SIMULATE, AutomationType.INTERNAL);
+        if (!remainder.isEmpty() || !canFactoryProcessProduce(factory, batch, process)) {
+            return 0;
+        }
+        int room = inputSlot.getLimit(batch.inputPerOperation) - inputSlot.getCount();
+        return room <= 0 ? 0 : room / batch.inputPerOperation.getCount();
+    }
+
+    private boolean canFactoryProcessProduce(IAEFactoryRecipeHost factory, FactoryBatch batch,
+          IAEFactoryRecipeHost.ProcessView process) {
+        if (batch.pressurizedOutput != null) {
+            return canAEPressurizedOutputAccept(factory, process, batch.pressurizedOutput, 1);
+        }
+        return canAEOutputsToSlots(factory, batch.machineRecipe, process);
     }
 
     @Nullable
@@ -264,7 +494,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         }
         if (!AERecipeRouteLegacyIO.matchesInput(recipe, stack)) {
             return rejectAEItemInputProcess(factory, "AE supplied {} but recipe expects {}", AEUpgradeDebug.stack(stack),
-                  AEUpgradeDebug.stack(recipe.getInputStack()));
+                  AEUpgradeDebug.inputStack(recipe));
         }
         for (IAEFactoryRecipeHost.ProcessView processInfo : processes) {
             if (canAcceptAEItemInput(factory, processInfo, recipe, stack)) {
@@ -272,7 +502,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             }
         }
         return rejectAEItemInputProcess(factory, "no process can accept {} for output {}", AEUpgradeDebug.stack(stack),
-              AEUpgradeDebug.stack(recipe.getOutputStack()));
+              AEUpgradeDebug.outputStack(recipe));
     }
 
     @Nullable
@@ -296,7 +526,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
                 return processInfo;
             }
         }
-        return rejectAEItemInputProcess(factory, "no process can accept AE double inputs for output {}", AEUpgradeDebug.stack(recipe.getOutputStack()));
+        return rejectAEItemInputProcess(factory, "no process can accept AE double inputs for output {}", AEUpgradeDebug.outputStack(recipe));
     }
 
     private boolean canAcceptAEItemInput(IAEFactoryRecipeHost factory, IAEFactoryRecipeHost.ProcessView processInfo, AEExposedRecipe recipe,
@@ -702,7 +932,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             }
         }
         return rejectAEItemInputProcess(factory, "no process can accept AE pressurized inputs for output {}",
-              AEUpgradeDebug.stacks(recipe.getOutputStacks()));
+              AEUpgradeDebug.outputStacks(recipe));
     }
 
     private boolean canAcceptAEPressurizedItemInput(IAEFactoryRecipeHost factory, IAEFactoryRecipeHost.ProcessView processInfo,
@@ -1100,6 +1330,55 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
     private boolean rejectAEItemInput(IAEFactoryRecipeHost factory, String reason, Object... args) {
         AEUpgradeDebug.log(factory, "rejecting AE item input: " + reason, args);
         return false;
+    }
+
+    @Nullable
+    private AERecipeTransferPlan rejectAEItemInputPlan(IAEFactoryRecipeHost factory, String reason, Object... args) {
+        rejectAEItemInput(factory, reason, args);
+        return null;
+    }
+
+    private static final class FactoryBatch {
+
+        private final MachineRecipe<?, ?, ?> machineRecipe;
+        private final ItemStack inputPerOperation;
+        private final int operations;
+        private final List<SharedTransfer> sharedInputs;
+        @Nullable
+        private final PressurizedOutput pressurizedOutput;
+
+        private FactoryBatch(MachineRecipe<?, ?, ?> machineRecipe, ItemStack inputPerOperation, int operations,
+              List<SharedTransfer> sharedInputs, @Nullable PressurizedOutput pressurizedOutput) {
+            this.machineRecipe = machineRecipe;
+            this.inputPerOperation = inputPerOperation.copy();
+            this.operations = operations;
+            this.sharedInputs = sharedInputs;
+            this.pressurizedOutput = pressurizedOutput;
+        }
+    }
+
+    private static final class SharedTransfer {
+
+        @Nullable
+        private final AERecipePort port;
+        private final AERecipeRouteStack stack;
+
+        private SharedTransfer(@Nullable AERecipePort port, AERecipeRouteStack stack) {
+            this.port = port;
+            this.stack = stack;
+        }
+    }
+
+    private static final class ProcessAllocation {
+
+        private final IAEFactoryRecipeHost.ProcessView process;
+        private final int capacity;
+        private int operations;
+
+        private ProcessAllocation(IAEFactoryRecipeHost.ProcessView process, int capacity) {
+            this.process = process;
+            this.capacity = capacity;
+        }
     }
 
     @Nullable

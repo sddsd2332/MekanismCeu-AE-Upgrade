@@ -73,11 +73,6 @@ public abstract class MixinTileEntitySolarNeutronActivator implements IAERecipeM
         }
     }
 
-    @Inject(method = "onAsyncUpdateServer", at = @At("TAIL"))
-    private void mekceuaeupgrade$onAsyncUpdateServer(CallbackInfo ci) {
-        mekceuaeupgrade$tickAEUpgradeServer();
-    }
-
     @Inject(method = "onRecipeCacheInvalidated", at = @At("TAIL"))
     private void mekceuaeupgrade$onRecipeCacheInvalidated(int cacheIndex, CallbackInfo ci) {
         mekceuaeupgrade$invalidateAERecipeCache();

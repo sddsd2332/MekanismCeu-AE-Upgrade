@@ -57,7 +57,7 @@ public abstract class MixinTileEntityRotaryCondensentrator implements IAERecipeM
     @Inject(method = "handlePacketData", at = @At(value = "INVOKE",
           target = "Lmekanism/common/recipe/cache/RecipeCacheLookupMonitor;onChange()V", shift = At.Shift.AFTER))
     private void mekceuaeupgrade$handleModePacketData(ByteBuf dataStream, CallbackInfo ci) {
-        mekceuaeupgrade$invalidateAERecipeCache();
+        mekceuaeupgrade$onAERecipePortsChanged();
     }
 
     public void onRecipeCacheInvalidated(int cacheIndex) {
@@ -72,6 +72,6 @@ public abstract class MixinTileEntityRotaryCondensentrator implements IAERecipeM
     @Inject(method = "setConfigurationData", at = @At("TAIL"))
     private void mekceuaeupgrade$setConfigurationData(NBTTagCompound nbtTags, CallbackInfo ci) {
         AERecipeProfileManager.readConfigCardData((net.minecraft.tileentity.TileEntity) (Object) this, nbtTags);
-        mekceuaeupgrade$invalidateAERecipeCache();
+        mekceuaeupgrade$onAERecipePortsChanged();
     }
 }

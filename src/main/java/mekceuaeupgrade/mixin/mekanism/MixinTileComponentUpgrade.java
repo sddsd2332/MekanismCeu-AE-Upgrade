@@ -1,6 +1,7 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import mekceuaeupgrade.common.item.AEUpgrade;
 
@@ -33,8 +34,19 @@ public abstract class MixinTileComponentUpgrade {
 
     @Unique
     private void mekceuaeupgrade$addImplicitAEUpgrade(TileEntityContainerBlock tile) {
-        if (tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost) {
+        boolean supportsCrafting = tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost;
+        boolean supportsAutoProcessing = tile instanceof IAEItemRecipeHost;
+        if (supportsCrafting) {
             setSupported(AEUpgrade.AE_CRAFTING);
+            setSupported(AEUpgrade.AE_WIRELESS_CRAFTING);
+        }
+        if (supportsAutoProcessing) {
+            setSupported(AEUpgrade.AE_AUTO_PROCESSING);
+            setSupported(AEUpgrade.AE_WIRELESS_AUTO_PROCESSING);
+        }
+        if (!supportsCrafting && !supportsAutoProcessing && tile instanceof IAEOutputHost) {
+            setSupported(AEUpgrade.AE_OUTPUT);
+            setSupported(AEUpgrade.AE_WIRELESS_OUTPUT);
         }
     }
 }

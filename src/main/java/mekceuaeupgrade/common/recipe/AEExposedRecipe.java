@@ -1,8 +1,10 @@
 package mekceuaeupgrade.common.recipe;
 
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
+import mekceuaeupgrade.common.transfer.AERecipeNetworkTransferPlan;
 
 import ae2.api.crafting.IPatternDetails;
 import ae2.api.stacks.AEItemKey;
@@ -12,17 +14,21 @@ import mekceuaeupgrade.common.config.AERecipeKey;
 import mekceuaeupgrade.common.config.AERecipeProfile;
 import mekceuaeupgrade.common.config.AERecipeStackNBT;
 import mekanism.common.recipe.inputs.MachineInput;
+import mekanism.api.gas.GasStack;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.world.World;
+import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class AEExposedRecipe implements IPatternDetails {
@@ -38,8 +44,12 @@ public class AEExposedRecipe implements IPatternDetails {
     private final AERecipeKey recipeKey;
     @Nullable
     private final AERecipeRoute recipeRoute;
+    private final boolean selfReferentialOutput;
     private final int craftAmount;
     private int priority;
+    private boolean autoProcessingPlanResolved;
+    @Nullable
+    private AERecipeNetworkTransferPlan autoProcessingPlan;
 
     static final String PATTERN_INPUTS_TAG = "inputs";
     static final String PATTERN_OUTPUTS_TAG = "outputs";
@@ -89,23 +99,18 @@ public class AEExposedRecipe implements IPatternDetails {
         this.outputs = Collections.unmodifiableList(copiedOutputs);
         this.craftAmount = Math.max(1, craftAmount);
         output = this.outputs.isEmpty() ? ItemStack.EMPTY : this.outputs.get(0);
-        patternInputs = new IInput[this.inputs.size()];
-        for (int i = 0; i < this.inputs.size(); i++) {
-            patternInputs[i] = new Input(this.inputs.get(i));
+        List<GenericStack> condensedInputs = condenseStacks(this.inputs);
+        patternInputs = new IInput[condensedInputs.size()];
+        for (int i = 0; i < condensedInputs.size(); i++) {
+            patternInputs[i] = new Input(condensedInputs.get(i));
         }
-        List<GenericStack> genericOutputs = new ArrayList<>(this.outputs.size());
-        for (ItemStack stack : this.outputs) {
-            GenericStack genericStack = GenericStack.fromItemStack(stack);
-            if (genericStack != null) {
-                genericOutputs.add(genericStack);
-            }
-        }
-        patternOutputs = Collections.unmodifiableList(genericOutputs);
+        patternOutputs = Collections.unmodifiableList(condenseStacks(this.outputs));
         patternInput = new AEPatternInput(this.inputs);
         patternStack = createPatternStack(this.inputs, this.outputs, recipeKey, this.craftAmount);
         patternDefinition = Objects.requireNonNull(AEItemKey.of(patternStack), "pattern definition");
         this.recipeKey = recipeKey;
         this.recipeRoute = recipeRoute;
+        selfReferentialOutput = hasSelfReferentialOutput(this.inputs, this.outputs, recipeRoute);
     }
 
     public AEExposedRecipe withCraftAmount(int amount) {
@@ -190,6 +195,23 @@ public class AEExposedRecipe implements IPatternDetails {
         return craftAmount;
     }
 
+    public boolean hasSelfReferentialOutput() {
+        return selfReferentialOutput;
+    }
+
+    public boolean isExposableToCrafting() {
+        return !selfReferentialOutput;
+    }
+
+    @Nullable
+    public AERecipeNetworkTransferPlan getAutoProcessingPlan() {
+        if (!autoProcessingPlanResolved) {
+            autoProcessingPlan = AERecipeNetworkTransferPlan.fromRecipe(this);
+            autoProcessingPlanResolved = true;
+        }
+        return autoProcessingPlan;
+    }
+
     public boolean matchesInput(ItemStack stack) {
         return inputs.size() == 1 && inputContains(stack, inputs.get(0));
     }
@@ -255,6 +277,24 @@ public class AEExposedRecipe implements IPatternDetails {
         return patternOutputs;
     }
 
+    private static List<GenericStack> condenseStacks(List<ItemStack> stacks) {
+        Map<AEKey, Long> amounts = new LinkedHashMap<>();
+        for (ItemStack stack : stacks) {
+            GenericStack genericStack = Objects.requireNonNull(GenericStack.fromItemStack(stack), "pattern stack");
+            long amount = genericStack.amount();
+            long current = amounts.getOrDefault(genericStack.what(), 0L);
+            if (amount <= 0 || current > Long.MAX_VALUE - amount) {
+                throw new IllegalArgumentException("Invalid condensed pattern stack amount for " + genericStack.what());
+            }
+            amounts.put(genericStack.what(), current + amount);
+        }
+        List<GenericStack> condensed = new ArrayList<>(amounts.size());
+        for (Map.Entry<AEKey, Long> entry : amounts.entrySet()) {
+            condensed.add(new GenericStack(entry.getKey(), entry.getValue()));
+        }
+        return condensed;
+    }
+
     public boolean canSubstitute() {
         return false;
     }
@@ -306,6 +346,54 @@ public class AEExposedRecipe implements IPatternDetails {
               AEUpgradeFakeGas.inputContains(supplied, expected);
     }
 
+    private static boolean hasSelfReferentialOutput(List<ItemStack> inputs, List<ItemStack> outputs,
+          @Nullable AERecipeRoute route) {
+        if (route != null) {
+            for (AERecipeRouteStack input : route.inputs()) {
+                for (AERecipeRouteStack output : route.outputs()) {
+                    if (sameResource(input, output)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        for (ItemStack input : inputs) {
+            for (ItemStack output : outputs) {
+                if (sameItem(input, output)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean sameResource(AERecipeRouteStack input, AERecipeRouteStack output) {
+        if (input == null || output == null || input.kind() != output.kind()) {
+            return false;
+        }
+        return switch (input.kind()) {
+            case ITEM -> sameItem(input.itemStack(), output.itemStack());
+            case GAS -> sameGas(input.gasStack(), output.gasStack());
+            case FLUID -> sameFluid(input.fluidStack(), output.fluidStack());
+        };
+    }
+
+    private static boolean sameItem(ItemStack left, ItemStack right) {
+        return left != null && right != null && !left.isEmpty() && !right.isEmpty()
+              && ItemStack.areItemsEqual(left, right) && ItemStack.areItemStackTagsEqual(left, right);
+    }
+
+    private static boolean sameGas(@Nullable GasStack left, @Nullable GasStack right) {
+        return left != null && right != null && left.getGas() != null && right.getGas() != null
+              && left.amount > 0 && right.amount > 0 && left.isGasEqual(right);
+    }
+
+    private static boolean sameFluid(@Nullable FluidStack left, @Nullable FluidStack right) {
+        return left != null && right != null && left.getFluid() != null && right.getFluid() != null
+              && left.amount > 0 && right.amount > 0 && left.isFluidEqual(right);
+    }
+
     private static int inputsHash(List<ItemStack> stacks) {
         Object[] hashes = new Object[stacks.size()];
         for (int i = 0; i < stacks.size(); i++) {
@@ -320,10 +408,9 @@ public class AEExposedRecipe implements IPatternDetails {
         private final GenericStack genericStack;
         private final long multiplier;
 
-        private Input(ItemStack stack) {
-            GenericStack stackTemplate = Objects.requireNonNull(GenericStack.fromItemStack(stack), "pattern input");
-            this.genericStack = new GenericStack(stackTemplate.what(), 1);
-            this.multiplier = stackTemplate.amount();
+        private Input(GenericStack stack) {
+            this.genericStack = new GenericStack(stack.what(), 1);
+            this.multiplier = stack.amount();
         }
 
         @Override

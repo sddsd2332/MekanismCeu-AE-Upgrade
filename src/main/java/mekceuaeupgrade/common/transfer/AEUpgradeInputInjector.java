@@ -32,12 +32,12 @@ public final class AEUpgradeInputInjector {
     public static boolean push(IAEItemRecipeHost host, AEExposedRecipe recipe, List<ItemStack> inputs) {
         if (inputs.isEmpty()) {
             AEUpgradeDebug.log(host, "push rejected: AE supplied no inputs for recipe inputs={} outputs={}",
-                  AEUpgradeDebug.stacks(recipe.getInputStacks()), AEUpgradeDebug.stacks(recipe.getOutputStacks()));
+                  AEUpgradeDebug.inputStacks(recipe), AEUpgradeDebug.outputStacks(recipe));
             return false;
         }
         if (!recipe.matchesInputs(inputs)) {
             AEUpgradeDebug.log(host, "push rejected: AE supplied {} but recipe expects {}",
-                  AEUpgradeDebug.stacks(inputs), AEUpgradeDebug.stacks(recipe.getInputStacks()));
+                  AEUpgradeDebug.stacks(inputs), AEUpgradeDebug.inputStacks(recipe));
             return false;
         }
         if (!host.canAcceptAEItemInputs(recipe, inputs)) {
