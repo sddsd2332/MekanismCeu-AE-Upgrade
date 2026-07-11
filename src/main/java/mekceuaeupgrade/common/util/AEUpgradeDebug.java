@@ -1,9 +1,8 @@
 package mekceuaeupgrade.common.util;
 
+import mekanism.api.MekanismAPI;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-
-import mekanism.api.MekanismAPI;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;

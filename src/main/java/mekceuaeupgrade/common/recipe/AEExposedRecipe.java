@@ -1,23 +1,20 @@
 package mekceuaeupgrade.common.recipe;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
-import mekceuaeupgrade.common.recipe.route.AERecipeStackKind;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
-import mekceuaeupgrade.common.transfer.AERecipeNetworkTransferPlan;
-
 import appeng.api.AEApi;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEItemStack;
+import mekanism.api.gas.GasStack;
+import mekanism.common.recipe.inputs.MachineInput;
 import mekceuaeupgrade.common.config.AERecipeKey;
 import mekceuaeupgrade.common.config.AERecipeProfile;
 import mekceuaeupgrade.common.config.AERecipeStackNBT;
-import mekanism.api.gas.GasStack;
-import mekanism.common.recipe.inputs.MachineInput;
+import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
+import mekceuaeupgrade.common.transfer.AERecipeNetworkTransferPlan;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -26,13 +23,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public class AEExposedRecipe implements ICraftingPatternDetails {
 

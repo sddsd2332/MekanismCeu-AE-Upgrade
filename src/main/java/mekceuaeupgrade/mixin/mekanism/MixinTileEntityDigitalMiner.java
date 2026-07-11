@@ -1,14 +1,13 @@
 package mekceuaeupgrade.mixin.mekanism;
 
+import mekanism.api.AutomationType;
+import mekanism.api.inventory.IInventorySlot;
+import mekanism.common.tile.machine.TileEntityDigitalMiner;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceuaeupgrade.common.transfer.AEUpgradeOutputDrainer;
-
-import mekanism.api.AutomationType;
-import mekanism.api.inventory.IInventorySlot;
-import mekanism.common.tile.machine.TileEntityDigitalMiner;
 import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

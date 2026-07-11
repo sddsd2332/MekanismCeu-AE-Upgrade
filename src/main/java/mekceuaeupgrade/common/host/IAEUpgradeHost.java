@@ -1,8 +1,5 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
@@ -14,6 +11,7 @@ import appeng.api.util.DimensionalCoord;
 import appeng.me.helpers.AENetworkProxy;
 import appeng.me.helpers.IGridProxyable;
 import mekanism.common.base.IUpgradeTile;
+import mekceuaeupgrade.common.item.AEUpgrade;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.tileentity.TileEntity;
 

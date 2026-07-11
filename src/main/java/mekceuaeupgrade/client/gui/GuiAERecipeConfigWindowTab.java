@@ -1,11 +1,5 @@
 package mekceuaeupgrade.client.gui;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-import mekceuaeupgrade.common.host.IAEUpgradeHost;
-import mekceuaeupgrade.common.ui.AELang;
-import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
-
 import mekanism.client.SpecialColors;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.tab.window.GuiWindowCreatorTab;
@@ -13,6 +7,8 @@ import mekanism.client.gui.element.window.GuiWindow;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
 import mekanism.common.util.MekanismUtils;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 

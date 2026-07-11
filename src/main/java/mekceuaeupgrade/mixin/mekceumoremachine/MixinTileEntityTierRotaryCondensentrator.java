@@ -1,16 +1,13 @@
 package mekceuaeupgrade.mixin.mekceumoremachine;
 
+import io.netty.buffer.ByteBuf;
+import mekanism.common.recipe.RecipeHandler;
 import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
-import io.netty.buffer.ByteBuf;
-import mekanism.common.recipe.RecipeHandler;
-import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceumoremachine.common.capability.ResizableFluidTank;
 import mekceumoremachine.common.capability.ResizableGasTank;
 import mekceumoremachine.common.tile.machine.TileEntityTierRotaryCondensentrator;

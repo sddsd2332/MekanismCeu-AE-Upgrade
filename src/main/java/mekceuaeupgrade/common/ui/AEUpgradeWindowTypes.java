@@ -1,9 +1,8 @@
 package mekceuaeupgrade.common.ui;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekanism.common.config.MekanismConfig;
 import mekanism.common.inventory.container.SelectedWindowData.WindowType;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import net.minecraft.util.ResourceLocation;
 
 public final class AEUpgradeWindowTypes {

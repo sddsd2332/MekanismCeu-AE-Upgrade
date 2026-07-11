@@ -1,20 +1,20 @@
 package mekceuaeupgrade.common.config;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.host.IAEItemRecipeHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHost;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
-
 import com.github.bsideup.jabel.Desugar;
-import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
+import mekanism.api.Coord4D;
 import mekanism.common.PacketHandler;
 import mekanism.common.base.IFactory;
 import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.security.ISecurityTile;
 import mekanism.common.tile.factory.TileEntityFactory;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHost;
+import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
 import net.minecraft.block.Block;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -23,7 +23,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
-import mekanism.api.Coord4D;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -31,17 +30,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.WeakHashMap;
+import java.util.*;
 
 public final class AERecipeProfileManager {
 

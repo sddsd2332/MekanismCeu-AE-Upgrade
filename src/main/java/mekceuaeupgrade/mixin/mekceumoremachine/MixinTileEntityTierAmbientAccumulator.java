@@ -5,7 +5,6 @@ import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceuaeupgrade.common.transfer.AEUpgradeOutputDrainer;
-
 import mekceumoremachine.common.capability.ResizableGasTank;
 import mekceumoremachine.common.tile.machine.TileEntityTierAmbientAccumulator;
 import org.spongepowered.asm.mixin.Mixin;

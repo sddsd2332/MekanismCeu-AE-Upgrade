@@ -1,9 +1,5 @@
 package mekceuaeupgrade.common.core;
 
-import mekceuaeupgrade.client.ClientProxy;
-import mekceuaeupgrade.common.item.AEUpgrade;
-import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
-
 import io.netty.buffer.ByteBuf;
 import mekanism.common.Mekanism;
 import mekanism.common.Version;
@@ -12,6 +8,7 @@ import mekanism.common.config.MekanismConfig;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.network.MEKCeuAEUpgradePacketHandler;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
+import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
 import mekceuaeupgrade.mekceuaeupgrade.Tags;
 import net.minecraft.item.Item;
 import net.minecraft.item.crafting.IRecipe;
@@ -28,9 +25,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = MEKCeuAEUpgrade.MODID, useMetadata = true, dependencies = "required-after:mekanism;required-after:appliedenergistics2;required-after:ae2fc;required-after:mekeng;required-after:mixinbooter", customProperties = {
-      @Mod.CustomProperty(k = "license", v = "MIT")
-})
+@Mod(modid = MEKCeuAEUpgrade.MODID, useMetadata = true, dependencies = "required-after:mekanism;required-after:appliedenergistics2;required-after:ae2fc;required-after:mekeng;required-after:mixinbooter")
 @Mod.EventBusSubscriber
 public class MEKCeuAEUpgrade implements IModule {
 

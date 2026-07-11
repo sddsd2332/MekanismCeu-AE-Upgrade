@@ -1,9 +1,8 @@
 package mekceuaeupgrade.client.gui;
 
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
 
 import java.util.function.Supplier;
 

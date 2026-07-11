@@ -1,7 +1,6 @@
 package mekceuaeupgrade.common.network;
 
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraftforge.fml.common.network.NetworkRegistry;

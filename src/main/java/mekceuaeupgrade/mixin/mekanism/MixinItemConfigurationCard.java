@@ -1,7 +1,5 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
 import mekanism.common.item.ItemConfigurationCard;

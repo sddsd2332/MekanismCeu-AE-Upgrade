@@ -1,9 +1,8 @@
 package mekceuaeupgrade.client;
 
+import mekanism.client.render.MekanismRenderer;
 import mekceuaeupgrade.common.core.CommonProxy;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
-import mekanism.client.render.MekanismRenderer;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import net.minecraft.item.Item;
 import net.minecraftforge.fml.relauncher.Side;

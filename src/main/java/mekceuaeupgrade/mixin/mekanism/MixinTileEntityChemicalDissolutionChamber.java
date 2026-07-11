@@ -1,13 +1,5 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.adapter.AEHybridRecipeAdapters;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAERecipeMachineHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.math.MathUtils;
 import mekanism.common.MekanismFluids;
@@ -19,6 +11,11 @@ import mekanism.common.recipe.machines.DissolutionRecipe;
 import mekanism.common.recipe.outputs.GasOutput;
 import mekanism.common.tile.machine.TileEntityChemicalDissolutionChamber;
 import mekanism.common.tile.prefab.TileEntityBasicMachine;
+import mekceuaeupgrade.common.adapter.AEHybridRecipeAdapters;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;

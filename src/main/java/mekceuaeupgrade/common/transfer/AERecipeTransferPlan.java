@@ -1,22 +1,16 @@
 package mekceuaeupgrade.common.transfer;
 
+import mekanism.api.gas.GasStack;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
 import mekceuaeupgrade.common.recipe.route.AERecipeRouteLegacyIO;
 import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
 import mekceuaeupgrade.common.recipe.route.AERecipeStackKind;
-
-import mekanism.api.gas.GasStack;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 一次 AE 配方输入转移的原子执行计划。

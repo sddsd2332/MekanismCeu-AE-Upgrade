@@ -1,12 +1,11 @@
 package mekceuaeupgrade.common.item;
 
+import mekanism.api.EnumColor;
+import mekanism.common.Upgrade;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
-
-import mekanism.api.EnumColor;
-import mekanism.common.Upgrade;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import net.minecraft.item.ItemStack;
 

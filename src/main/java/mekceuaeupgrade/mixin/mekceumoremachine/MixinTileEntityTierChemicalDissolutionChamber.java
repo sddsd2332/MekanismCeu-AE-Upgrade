@@ -1,19 +1,16 @@
 package mekceuaeupgrade.mixin.mekceumoremachine;
 
-import mekceuaeupgrade.common.adapter.AEMoreMachineRecipeAdapters;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAERecipeMachineHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.inventory.IInventorySlot;
 import mekanism.api.math.MathUtils;
 import mekanism.common.MekanismFluids;
 import mekanism.common.recipe.RecipeHandler;
+import mekceuaeupgrade.common.adapter.AEMoreMachineRecipeAdapters;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceumoremachine.common.capability.ResizableGasTank;
 import mekceumoremachine.common.tier.MachineTier;
 import mekceumoremachine.common.tile.machine.TierDissolution.TileEntityTierChemicalDissolutionChamber;

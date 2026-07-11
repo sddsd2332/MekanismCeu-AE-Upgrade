@@ -1,9 +1,5 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.adapter.AEFactoryRecipeAdapter;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
 import mekanism.api.inventory.IInventorySlot;
@@ -14,6 +10,8 @@ import mekanism.common.capabilities.gas.BasicGasTank;
 import mekanism.common.inventory.slot.BasicInventorySlot;
 import mekanism.common.recipe.inputs.MachineInput;
 import mekanism.common.recipe.machines.MachineRecipe;
+import mekceuaeupgrade.common.adapter.AEFactoryRecipeAdapter;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 

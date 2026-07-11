@@ -1,16 +1,15 @@
 package mekceuaeupgrade.mixin.mekceumoremachine;
 
-import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAERecipeMachineHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-
 import mekanism.api.IConfigCardAccess.ISpecialConfigData;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.recipe.inputs.GasInput;
 import mekanism.common.recipe.machines.SolarNeutronRecipe;
+import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceumoremachine.common.capability.ResizableGasTank;
 import mekceumoremachine.common.tile.machine.TileEntityTierSolarNeutronActivator;
 import net.minecraft.nbt.NBTTagCompound;

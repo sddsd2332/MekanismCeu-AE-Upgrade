@@ -1,12 +1,5 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEFactoryProcessView;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAEFactoryRecipeHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
 import mekanism.api.math.MathUtils;
@@ -20,6 +13,10 @@ import mekanism.common.recipe.inputs.MachineInput;
 import mekanism.common.recipe.machines.MachineRecipe;
 import mekanism.common.tile.factory.TileEntityFactory;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.AEFactoryProcessView;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAEFactoryRecipeHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.fluids.FluidStack;

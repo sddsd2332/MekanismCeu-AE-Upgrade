@@ -1,17 +1,5 @@
 package mekceuaeupgrade.client.gui;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.ui.AELang;
-import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
-
-import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
-import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Product;
-import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Route;
-import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-import mekceuaeupgrade.common.config.AERecipeProfile;
-import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
-import mekceuaeupgrade.common.network.PacketAERecipeConfig.RecipeConfigPacket;
 import mekanism.api.Coord4D;
 import mekanism.client.gui.GuiMekanism;
 import mekanism.client.gui.GuiUtils;
@@ -25,8 +13,18 @@ import mekanism.client.gui.element.text.GuiTextField;
 import mekanism.client.gui.element.window.GuiWindow;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
+import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
+import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
+import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Product;
+import mekceuaeupgrade.common.config.AERecipeConfigSnapshot.Route;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.config.AERecipeProfile;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
+import mekceuaeupgrade.common.network.PacketAERecipeConfig.RecipeConfigPacket;
+import mekceuaeupgrade.common.ui.AELang;
+import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.text.TextComponentString;
 import org.lwjgl.opengl.GL11;

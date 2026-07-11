@@ -1,14 +1,14 @@
 package mekceuaeupgrade.common.item;
 
 import appeng.api.AEApi;
-import appeng.api.features.INetworkEncodable;
 import appeng.api.features.ILocatable;
+import appeng.api.features.INetworkEncodable;
 import appeng.api.util.DimensionalCoord;
-import appeng.util.Platform;
 import appeng.me.helpers.IGridProxyable;
-import mekanism.common.base.IUpgradeTile;
+import appeng.util.Platform;
 import mekanism.api.EnumColor;
 import mekanism.common.Upgrade;
+import mekanism.common.base.IUpgradeTile;
 import mekanism.common.item.ItemUpgrade;
 import mekanism.common.util.LangUtils;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;

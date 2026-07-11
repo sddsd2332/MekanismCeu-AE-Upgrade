@@ -1,9 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
-import mekceuaeupgrade.common.recipe.route.AERecipeStackKind;
-
 import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.fluid.IExtendedFluidTank;
@@ -11,6 +7,9 @@ import mekanism.api.gas.GasStack;
 import mekanism.api.gas.IExtendedGasTank;
 import mekanism.api.inventory.IInventorySlot;
 import mekanism.common.inventory.slot.BasicInventorySlot;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
+import mekceuaeupgrade.common.recipe.route.AERecipeStackKind;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 

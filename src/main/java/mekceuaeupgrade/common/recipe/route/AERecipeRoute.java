@@ -1,11 +1,9 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-
 import com.github.bsideup.jabel.Desugar;
 import mekanism.api.gas.GasStack;
 import mekceuaeupgrade.common.config.AEItemStackKey;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -13,11 +11,7 @@ import javax.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * 一条可暴露给 AE 的 Mekanism 配方路线。

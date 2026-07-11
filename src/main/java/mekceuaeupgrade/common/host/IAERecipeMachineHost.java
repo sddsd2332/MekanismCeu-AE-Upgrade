@@ -1,9 +1,7 @@
 package mekceuaeupgrade.common.host;
 
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-
 import net.minecraft.item.ItemStack;
 
 import java.util.List;

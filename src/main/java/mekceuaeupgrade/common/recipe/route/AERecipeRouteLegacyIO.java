@@ -1,15 +1,13 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
 import mekanism.common.inventory.slot.gas.GasInventorySlot;
 import mekanism.common.recipe.GasConversionHandler;
 import mekanism.common.recipe.inputs.MachineInput;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 

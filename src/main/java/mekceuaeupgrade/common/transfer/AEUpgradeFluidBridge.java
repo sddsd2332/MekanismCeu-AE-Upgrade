@@ -1,8 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.storage.IMEInventory;
@@ -11,6 +8,7 @@ import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.fluids.util.AEFluidStack;
 import appeng.me.GridAccessException;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
 import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nullable;

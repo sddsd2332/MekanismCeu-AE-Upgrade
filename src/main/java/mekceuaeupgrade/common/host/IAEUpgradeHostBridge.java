@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import net.minecraft.nbt.NBTTagCompound;
 
 public interface IAEUpgradeHostBridge extends IAEUpgradeHost {

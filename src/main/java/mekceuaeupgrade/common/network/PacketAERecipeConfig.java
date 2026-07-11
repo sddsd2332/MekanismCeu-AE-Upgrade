@@ -1,18 +1,17 @@
 package mekceuaeupgrade.common.network;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.IAEUpgradeHost;
-
 import io.netty.buffer.ByteBuf;
-import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
-import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-import mekceuaeupgrade.common.config.AERecipeProfileManager;
-import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
 import mekanism.api.Coord4D;
 import mekanism.common.PacketHandler;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
 import mekanism.common.util.MekanismUtils;
+import mekceuaeupgrade.common.config.AERecipeConfigClientCache;
+import mekceuaeupgrade.common.config.AERecipeConfigSnapshot;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekceuaeupgrade.common.host.IAEUpgradeHost;
+import mekceuaeupgrade.common.network.PacketAERecipeConfig.AERecipeConfigMessage;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.nbt.NBTTagCompound;

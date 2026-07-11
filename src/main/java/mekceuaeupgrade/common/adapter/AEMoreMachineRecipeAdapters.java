@@ -1,20 +1,5 @@
 package mekceuaeupgrade.common.adapter;
 
-import mekceuaeupgrade.common.config.AEItemStackKey;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.host.IAEItemRecipeHost;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.AERecipeStacks;
-import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteCollectors;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteLegacyIO;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
-import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
-import mekceuaeupgrade.common.transfer.AERecipePort;
-import mekceuaeupgrade.common.transfer.AERecipeTransferPlan;
-import mekceuaeupgrade.common.util.AEUpgradeDebug;
-
 import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.fluid.IExtendedFluidTank;
@@ -24,32 +9,36 @@ import mekanism.api.gas.IExtendedGasTank;
 import mekanism.api.inventory.IInventorySlot;
 import mekanism.common.recipe.GasConversionHandler;
 import mekanism.common.recipe.RecipeHandler;
-import mekanism.common.recipe.inputs.ChemicalGasInput;
-import mekanism.common.recipe.inputs.GasAndFluidInput;
-import mekanism.common.recipe.inputs.GasInput;
-import mekanism.common.recipe.inputs.ItemStackInput;
-import mekanism.common.recipe.inputs.MachineInput;
-import mekanism.common.recipe.inputs.NucleosynthesizerInput;
+import mekanism.common.recipe.inputs.*;
 import mekanism.common.recipe.machines.CrystallizerRecipe;
 import mekanism.common.recipe.machines.MachineRecipe;
 import mekanism.common.recipe.outputs.FluidOutput;
 import mekanism.common.recipe.outputs.GasOutput;
 import mekanism.common.recipe.outputs.ItemStackOutput;
 import mekanism.common.recipe.outputs.MachineOutput;
+import mekceuaeupgrade.common.config.AEItemStackKey;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.AERecipeStacks;
+import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteCollectors;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteLegacyIO;
+import mekceuaeupgrade.common.transfer.AERecipePort;
+import mekceuaeupgrade.common.transfer.AERecipeTransferPlan;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
+import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
+import mekceuaeupgrade.common.util.AEUpgradeDebug;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.function.Consumer;
 
 public final class AEMoreMachineRecipeAdapters {
 

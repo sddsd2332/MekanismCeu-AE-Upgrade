@@ -1,59 +1,29 @@
 package mekceuaeupgrade.common.recipe;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import mekanism.api.gas.Gas;
+import mekanism.api.infuse.InfuseObject;
+import mekanism.api.infuse.InfuseRegistry;
+import mekanism.common.recipe.RecipeHandler;
+import mekanism.common.recipe.inputs.*;
+import mekanism.common.recipe.machines.*;
+import mekanism.common.recipe.outputs.ChemicalPairOutput;
+import mekanism.common.recipe.outputs.GasOutput;
+import mekanism.common.recipe.outputs.ItemStackOutput;
+import mekanism.common.recipe.outputs.PressurizedOutput;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.config.AERecipeProfile;
+import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
 import mekceuaeupgrade.common.recipe.route.AERecipeRouteCollectors;
 import mekceuaeupgrade.common.transfer.AEUpgradeFluidBridge;
-
-import mekceuaeupgrade.common.config.AERecipeProfile;
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-import mekceuaeupgrade.common.config.AERecipeProfileManager;
-import mekanism.api.gas.Gas;
-import mekanism.api.infuse.InfuseObject;
-import mekanism.api.infuse.InfuseRegistry;
-import mekanism.common.recipe.RecipeHandler;
-import mekanism.common.recipe.inputs.AdvancedMachineInput;
-import mekanism.common.recipe.inputs.DoubleMachineInput;
-import mekanism.common.recipe.inputs.FluidInput;
-import mekanism.common.recipe.inputs.GasAndFluidInput;
-import mekanism.common.recipe.inputs.InfusionInput;
-import mekanism.common.recipe.inputs.ItemStackInput;
-import mekanism.common.recipe.inputs.MachineInput;
-import mekanism.common.recipe.inputs.NucleosynthesizerInput;
-import mekanism.common.recipe.inputs.PressurizedInput;
-import mekanism.common.recipe.inputs.RotaryInput;
-import mekanism.common.recipe.machines.AdvancedMachineRecipe;
-import mekanism.common.recipe.machines.BasicMachineRecipe;
-import mekanism.common.recipe.machines.Chance2MachineRecipe;
-import mekanism.common.recipe.machines.ChanceMachineRecipe;
-import mekanism.common.recipe.machines.ChemicalInfuserRecipe;
-import mekanism.common.recipe.machines.DoubleMachineRecipe;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
-import mekanism.common.recipe.machines.MachineRecipe;
-import mekanism.common.recipe.machines.MetallurgicInfuserRecipe;
-import mekanism.common.recipe.machines.NucleosynthesizerRecipe;
-import mekanism.common.recipe.machines.PressurizedRecipe;
-import mekanism.common.recipe.machines.RotaryRecipe;
-import mekanism.common.recipe.outputs.ChemicalPairOutput;
-import mekanism.common.recipe.outputs.GasOutput;
-import mekanism.common.recipe.outputs.ItemStackOutput;
-import mekanism.common.recipe.outputs.PressurizedOutput;
 import net.minecraft.item.ItemStack;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Random;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Predicate;
 
 public class AEUpgradeRecipeCache {
 

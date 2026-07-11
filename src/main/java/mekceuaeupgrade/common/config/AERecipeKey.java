@@ -1,8 +1,6 @@
 package mekceuaeupgrade.common.config;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;

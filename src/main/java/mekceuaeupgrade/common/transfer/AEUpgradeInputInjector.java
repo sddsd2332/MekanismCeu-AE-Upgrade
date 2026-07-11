@@ -1,15 +1,13 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.IAEItemRecipeHost;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
-import mekceuaeupgrade.common.util.AEUpgradeDebug;
-
 import mekanism.api.fluid.IExtendedFluidTank;
 import mekanism.api.gas.GasStack;
 import mekanism.api.gas.IExtendedGasTank;
 import mekanism.api.inventory.IInventorySlot;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
+import mekceuaeupgrade.common.util.AEUpgradeDebug;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;

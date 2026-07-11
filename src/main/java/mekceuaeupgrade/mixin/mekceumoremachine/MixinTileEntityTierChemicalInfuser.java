@@ -1,17 +1,14 @@
 package mekceuaeupgrade.mixin.mekceumoremachine;
 
-import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAERecipeMachineHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import mekanism.common.recipe.inputs.ChemicalPairInput;
 import mekanism.common.recipe.machines.ChemicalInfuserRecipe;
 import mekanism.common.recipe.outputs.GasOutput;
 import mekanism.common.tile.prefab.TileEntityBasicMachine;
+import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceumoremachine.common.capability.ResizableGasTank;
 import mekceumoremachine.common.tile.machine.TileEntityTierChemicalInfuser;
 import org.spongepowered.asm.mixin.Mixin;

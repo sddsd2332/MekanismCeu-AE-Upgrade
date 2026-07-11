@@ -1,10 +1,9 @@
 package mekceuaeupgrade.common.registries;
 
+import mekanism.common.item.ItemUpgrade;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.item.ItemAEWirelessUpgrade;
-
-import mekanism.common.item.ItemUpgrade;
 import net.minecraft.item.Item;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.registry.GameRegistry.ObjectHolder;

@@ -1,17 +1,5 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.config.AERecipeConfigType;
-import mekceuaeupgrade.common.config.AERecipeProfile;
-import mekceuaeupgrade.common.item.AEUpgrade;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
-import mekceuaeupgrade.common.transfer.AEAutoProcessingController;
-import mekceuaeupgrade.common.transfer.AEUpgradeFluidBridge;
-import mekceuaeupgrade.common.transfer.AEUpgradeGasBridge;
-import mekceuaeupgrade.common.transfer.AEUpgradeInputInjector;
-import mekceuaeupgrade.common.util.AEUpgradeDebug;
-
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.features.ILocatable;
@@ -19,8 +7,8 @@ import appeng.api.networking.GridFlags;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridHost;
 import appeng.api.networking.IGridNode;
-import appeng.api.networking.crafting.ICraftingProviderHelper;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
+import appeng.api.networking.crafting.ICraftingProviderHelper;
 import appeng.api.networking.events.MENetworkCraftingPatternChange;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.IActionSource;
@@ -29,8 +17,8 @@ import appeng.api.storage.IMEInventory;
 import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.IStorageChannel;
 import appeng.api.storage.channels.IItemStorageChannel;
-import appeng.api.storage.data.IAEStack;
 import appeng.api.storage.data.IAEItemStack;
+import appeng.api.storage.data.IAEStack;
 import appeng.api.util.AECableType;
 import appeng.api.util.AEPartLocation;
 import appeng.me.GridAccessException;
@@ -39,10 +27,20 @@ import appeng.me.helpers.MachineSource;
 import appeng.util.item.AEItemStack;
 import mekanism.api.IContentsListener;
 import mekanism.api.IContentsListenerRegistry;
+import mekanism.api.IContainerTransaction;
 import mekanism.api.gas.GasStack;
-import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekanism.common.util.MekanismUtils;
+import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.config.AERecipeProfile;
+import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
+import mekceuaeupgrade.common.transfer.AEAutoProcessingController;
+import mekceuaeupgrade.common.transfer.AEUpgradeFluidBridge;
+import mekceuaeupgrade.common.transfer.AEUpgradeGasBridge;
+import mekceuaeupgrade.common.transfer.AEUpgradeInputInjector;
+import mekceuaeupgrade.common.util.AEUpgradeDebug;
 import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -53,12 +51,8 @@ import net.minecraftforge.fluids.FluidStack;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Supplier;
 
 public class AEUpgradeNode {
 
@@ -102,6 +96,7 @@ public class AEUpgradeNode {
     public static final int MAX_GLOBAL_PROFILE_SLOT = 10;
 
     private final IAEUpgradeHost host;
+    private final Object machineAccessMonitor;
     private final AENetworkProxy proxy;
     private final AEUpgradeRecipeCache recipeCache;
     private final MachineSource source;
@@ -182,8 +177,9 @@ public class AEUpgradeNode {
     @Nullable
     private static IItemStorageChannel itemStorageChannel;
 
-    public AEUpgradeNode(IAEUpgradeHost host) {
+    public AEUpgradeNode(IAEUpgradeHost host, Object machineAccessMonitor) {
         this.host = host;
+        this.machineAccessMonitor = Objects.requireNonNull(machineAccessMonitor);
         proxy = new AENetworkProxy(host, "aeUpgrade", new ItemStack(MEKCeuAEUpgradeItems.AECraftingUpgrade), true);
         proxy.setFlags(GridFlags.REQUIRE_CHANNEL);
         proxy.setIdlePowerUsage(0.0);
@@ -745,9 +741,14 @@ public class AEUpgradeNode {
                   proxy.getNode() != null, proxy.isActive(), proxy.isPowered(), connectionSide);
             return true;
         }
-        if (host instanceof IAEItemRecipeHost itemHost && !itemHost.canAcceptAnyAEItemInput()) {
-            debugBusy("busy: machine cannot currently accept any AE item input");
-            return true;
+        if (host instanceof IAEItemRecipeHost itemHost) {
+            return callMachineContainerTransaction(() -> {
+                if (itemHost.canAcceptAnyAEItemInput()) {
+                    return false;
+                }
+                debugBusy("busy: machine cannot currently accept any AE item input");
+                return true;
+            });
         }
         return false;
     }
@@ -787,13 +788,23 @@ public class AEUpgradeNode {
             AEUpgradeDebug.log(host, "pushPattern rejected: no matching exposed recipe for AE pattern");
             return false;
         }
-        boolean pushed = AEUpgradeInputInjector.push(itemHost, recipe, table);
-        if (pushed) {
-            resetOutputDrainSchedule();
-            AEUpgradeDebug.log(host, "pushPattern accepted inputs={} outputs={}",
-                  AEUpgradeDebug.inputStacks(recipe), AEUpgradeDebug.outputStacks(recipe));
+        if (!callMachineContainerTransaction(() -> AEUpgradeInputInjector.push(itemHost, recipe, table))) {
+            return false;
         }
-        return pushed;
+        resetOutputDrainSchedule();
+        AEUpgradeDebug.log(host, "pushPattern accepted inputs={} outputs={}",
+              AEUpgradeDebug.inputStacks(recipe), AEUpgradeDebug.outputStacks(recipe));
+        return true;
+    }
+
+    public <T> T callMachineContainerTransaction(Supplier<T> action) {
+        Objects.requireNonNull(action, "Machine container transaction action cannot be null");
+        if (host instanceof IContainerTransaction transaction) {
+            return transaction.callContainerTransaction(action);
+        }
+        synchronized (machineAccessMonitor) {
+            return action.get();
+        }
     }
 
     public boolean canUseNetwork() {

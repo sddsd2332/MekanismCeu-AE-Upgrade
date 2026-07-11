@@ -1,10 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
-import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
-
 import appeng.api.config.Actionable;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IAEItemStack;
@@ -12,6 +7,10 @@ import appeng.api.storage.data.IAEStack;
 import appeng.fluids.util.AEFluidStack;
 import appeng.util.item.AEItemStack;
 import mekanism.api.gas.GasStack;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
+import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.items.ItemHandlerHelper;

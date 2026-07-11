@@ -1,13 +1,5 @@
 package mekceuaeupgrade.mixin.multiblockmachine;
 
-import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
-import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
-import mekceuaeupgrade.common.host.IAERecipeMachineHost;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-import mekceuaeupgrade.common.item.AEUpgrade;
-
 import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.capabilities.gas.BasicGasTank;
 import mekanism.common.recipe.inputs.ChemicalPairInput;
@@ -15,7 +7,12 @@ import mekanism.common.recipe.machines.ChemicalInfuserRecipe;
 import mekanism.common.recipe.outputs.GasOutput;
 import mekanism.common.tile.prefab.TileEntityBasicMachine;
 import mekanism.multiblockmachine.common.tile.machine.TileEntityLargeChemicalInfuser;
+import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
+import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import net.minecraft.nbt.NBTTagCompound;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

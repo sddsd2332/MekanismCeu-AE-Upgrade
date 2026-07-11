@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 /**
  * AE 配方 route 中的栈状态类型。
  */

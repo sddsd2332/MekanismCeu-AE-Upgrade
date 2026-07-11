@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fml.common.Loader;

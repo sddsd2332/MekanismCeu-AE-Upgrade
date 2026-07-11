@@ -1,12 +1,10 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.IAEUpgradeHost;
-
 import mekanism.api.IConfigCardAccess.ISpecialConfigData;
 import mekanism.common.capabilities.Capabilities;
 import mekanism.common.tile.prefab.TileEntityBasicMachine;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
 import net.minecraftforge.common.capabilities.Capability;

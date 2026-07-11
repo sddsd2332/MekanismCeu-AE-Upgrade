@@ -1,23 +1,26 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 
 public final class AEUpgradeHostDelegate {
 
     private final IAEUpgradeHost host;
+    private final Object machineAccessMonitor = new Object();
     private final AEUpgradeNode node;
     private long lastServerTick = Long.MIN_VALUE;
 
     public AEUpgradeHostDelegate(IAEUpgradeHost host) {
         this.host = host;
-        node = new AEUpgradeNode(host);
+        node = new AEUpgradeNode(host, machineAccessMonitor);
     }
 
     public AEUpgradeNode getNode() {
         return node;
+    }
+
+    public Object getMachineAccessMonitor() {
+        return machineAccessMonitor;
     }
 
     public void read(NBTTagCompound nbtTags) {

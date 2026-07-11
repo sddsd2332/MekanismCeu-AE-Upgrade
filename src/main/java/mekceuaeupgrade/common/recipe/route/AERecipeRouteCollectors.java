@@ -1,34 +1,14 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.AERecipeItemInputs;
-import mekceuaeupgrade.common.recipe.AERecipeStacks;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
 import mekanism.common.recipe.GasConversionHandler;
 import mekanism.common.recipe.RecipeHandler;
-import mekanism.common.recipe.inputs.AdvancedMachineInput;
-import mekanism.common.recipe.inputs.ChemicalGasInput;
-import mekanism.common.recipe.inputs.ChemicalPairInput;
-import mekanism.common.recipe.inputs.FluidInput;
-import mekanism.common.recipe.inputs.GasAndFluidInput;
-import mekanism.common.recipe.inputs.GasInput;
-import mekanism.common.recipe.inputs.ItemStackInput;
-import mekanism.common.recipe.inputs.MachineInput;
-import mekanism.common.recipe.inputs.NucleosynthesizerInput;
-import mekanism.common.recipe.inputs.PressurizedInput;
-import mekanism.common.recipe.inputs.RotaryInput;
-import mekanism.common.recipe.machines.AdvancedMachineRecipe;
-import mekanism.common.recipe.machines.CrystallizerRecipe;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
-import mekanism.common.recipe.machines.MachineRecipe;
-import mekanism.common.recipe.machines.RotaryRecipe;
-import mekanism.common.recipe.outputs.ChemicalPairOutput;
-import mekanism.common.recipe.outputs.FluidOutput;
-import mekanism.common.recipe.outputs.GasOutput;
-import mekanism.common.recipe.outputs.ItemStackOutput;
-import mekanism.common.recipe.outputs.PressurizedOutput;
+import mekanism.common.recipe.inputs.*;
+import mekanism.common.recipe.machines.*;
+import mekanism.common.recipe.outputs.*;
+import mekceuaeupgrade.common.recipe.AERecipeItemInputs;
+import mekceuaeupgrade.common.recipe.AERecipeStacks;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 

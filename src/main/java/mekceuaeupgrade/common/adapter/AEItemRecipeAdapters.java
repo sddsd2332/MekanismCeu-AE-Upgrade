@@ -1,13 +1,5 @@
 package mekceuaeupgrade.common.adapter;
 
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.host.IAEItemRecipeHost;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
-import mekceuaeupgrade.common.transfer.AERecipePort;
-import mekceuaeupgrade.common.transfer.AERecipeTransferPlan;
-import mekceuaeupgrade.common.util.AEUpgradeDebug;
-
 import mekanism.api.Action;
 import mekanism.api.AutomationType;
 import mekanism.api.inventory.IInventorySlot;
@@ -22,14 +14,21 @@ import mekanism.common.recipe.machines.Chance2MachineRecipe;
 import mekanism.common.recipe.machines.ChanceMachineRecipe;
 import mekanism.common.recipe.machines.DoubleMachineRecipe;
 import mekanism.common.recipe.outputs.ChanceOutput;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
+import mekceuaeupgrade.common.transfer.AERecipePort;
+import mekceuaeupgrade.common.transfer.AERecipeTransferPlan;
+import mekceuaeupgrade.common.util.AEUpgradeDebug;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class AEItemRecipeAdapters {
 

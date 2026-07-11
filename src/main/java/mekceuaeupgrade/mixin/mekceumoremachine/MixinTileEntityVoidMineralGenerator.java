@@ -1,12 +1,11 @@
 package mekceuaeupgrade.mixin.mekceumoremachine;
 
+import mekanism.api.inventory.IInventorySlot;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceuaeupgrade.common.transfer.AEUpgradeOutputDrainer;
-
-import mekanism.api.inventory.IInventorySlot;
 import mekceumoremachine.common.tile.machine.TileEntityVoidMineralGenerator;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

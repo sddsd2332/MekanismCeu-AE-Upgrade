@@ -1,8 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.AEUpgradeNode;
-
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.storage.IMEInventory;
@@ -11,6 +8,7 @@ import appeng.api.storage.IStorageChannel;
 import appeng.api.storage.data.IAEStack;
 import appeng.me.GridAccessException;
 import mekanism.api.gas.GasStack;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
 import net.minecraftforge.fml.common.Loader;
 
 import javax.annotation.Nullable;

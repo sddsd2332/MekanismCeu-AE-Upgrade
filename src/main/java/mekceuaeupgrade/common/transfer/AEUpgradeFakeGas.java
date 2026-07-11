@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.transfer;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekanism.api.gas.GasStack;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fml.common.Loader;

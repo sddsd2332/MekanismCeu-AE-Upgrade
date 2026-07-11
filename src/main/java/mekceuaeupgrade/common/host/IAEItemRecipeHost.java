@@ -1,11 +1,9 @@
 package mekceuaeupgrade.common.host;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.AEExposedRecipe;
-import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
-
 import mekanism.common.recipe.inputs.ItemStackInput;
 import mekanism.common.recipe.machines.BasicMachineRecipe;
+import mekceuaeupgrade.common.recipe.AEExposedRecipe;
+import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
 import net.minecraft.item.ItemStack;
 
 import java.util.Collections;

@@ -1,13 +1,12 @@
 package mekceuaeupgrade.mixin.mekanism;
 
+import mekanism.common.capabilities.fluid.BasicFluidTank;
+import mekanism.common.tile.machine.TileEntityElectricPump;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceuaeupgrade.common.transfer.AEUpgradeOutputDrainer;
-
-import mekanism.common.capabilities.fluid.BasicFluidTank;
-import mekanism.common.tile.machine.TileEntityElectricPump;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;

@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.config;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.util.Constants.NBT;

@@ -1,7 +1,5 @@
 package mekceuaeupgrade.common.recipe;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import net.minecraft.item.ItemStack;
 
 import javax.annotation.Nonnull;

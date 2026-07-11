@@ -1,8 +1,6 @@
 package mekceuaeupgrade.common.config;
 
 import com.github.bsideup.jabel.Desugar;
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekanism.api.Coord4D;
 
 import javax.annotation.Nullable;

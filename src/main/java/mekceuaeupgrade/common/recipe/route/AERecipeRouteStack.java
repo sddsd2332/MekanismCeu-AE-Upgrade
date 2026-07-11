@@ -1,12 +1,10 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
+import com.github.bsideup.jabel.Desugar;
+import mekanism.api.gas.GasStack;
 import mekceuaeupgrade.common.recipe.AERecipeStacks;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
-
-import com.github.bsideup.jabel.Desugar;
-import mekanism.api.gas.GasStack;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 

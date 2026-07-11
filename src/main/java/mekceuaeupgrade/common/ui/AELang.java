@@ -1,10 +1,9 @@
 package mekceuaeupgrade.common.ui;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-
 import mekanism.api.annotations.NothingNullByDefault;
 import mekanism.api.text.ILangEntry;
 import mekanism.common.util.LangUtils;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import net.minecraft.util.ResourceLocation;
 
 import javax.annotation.Nullable;

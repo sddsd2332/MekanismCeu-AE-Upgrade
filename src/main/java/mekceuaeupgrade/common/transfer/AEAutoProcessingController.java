@@ -5,7 +5,6 @@ import mekceuaeupgrade.common.host.IAEFactoryRecipeHost;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.util.AEUpgradeDebug;
-
 import net.minecraft.item.ItemStack;
 
 import java.util.List;
@@ -68,7 +67,9 @@ public final class AEAutoProcessingController {
                   AEUpgradeDebug.outputStacks(acceptedRecipe));
             return false;
         }
-        if (!host.acceptAEItemInputs(acceptedRecipe, legacyInputs)) {
+        boolean accepted = node.callMachineContainerTransaction(() ->
+              host.canAcceptAEItemInputs(acceptedRecipe, legacyInputs) && host.acceptAEItemInputs(acceptedRecipe, legacyInputs));
+        if (!accepted) {
             inputPlan.rollback(node);
             AEUpgradeDebug.log(host, "auto processing rolled back inputs={} outputs={}",
                   AEUpgradeDebug.inputStacks(acceptedRecipe), AEUpgradeDebug.outputStacks(acceptedRecipe));
@@ -89,7 +90,7 @@ public final class AEAutoProcessingController {
             return null;
         }
         List<ItemStack> legacyInputs = inputPlan.getLegacyInputs();
-        if (!host.canAcceptAEItemInputs(recipe, legacyInputs)) {
+        if (!node.callMachineContainerTransaction(() -> host.canAcceptAEItemInputs(recipe, legacyInputs))) {
             return null;
         }
         // 自引用路线可能通过抽取输入释放恰好足够的 AE 空间，因此延后到真实抽取后再检查。

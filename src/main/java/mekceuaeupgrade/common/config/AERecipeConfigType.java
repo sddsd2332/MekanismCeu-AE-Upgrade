@@ -1,10 +1,9 @@
 package mekceuaeupgrade.common.config;
 
+import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import mekceuaeupgrade.common.ui.AELang;
 import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
-
-import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 
 public enum AERecipeConfigType {
     CRAFTING("crafting", AERecipeProfile.RouteFilterMode.BLACKLIST, true, true),

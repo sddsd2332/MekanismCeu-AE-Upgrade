@@ -1,13 +1,11 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
-
 import mekanism.common.concurrent.TaskExecutor;
 import mekanism.common.tile.base.TileEntityRestrictedTick;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
 import mekanism.common.util.concurrent.Action;
 import mekanism.common.util.concurrent.ActionExecutor;
+import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import net.minecraft.block.Block;
 import net.minecraft.nbt.NBTTagCompound;
 import org.spongepowered.asm.mixin.Mixin;
