@@ -263,20 +263,8 @@ public class AEUpgradeNode {
     public void read(NBTTagCompound nbtTags) {
         invalidateExposureModeCache();
         proxy.readFromNBT(nbtTags);
-        if (nbtTags.hasKey(PROFILE_OWNER_TAG)) {
-            try {
-                recipeProfileOwner = UUID.fromString(nbtTags.getString(PROFILE_OWNER_TAG));
-            } catch (IllegalArgumentException ignored) {
-                recipeProfileOwner = null;
-            }
-        }
-        if (nbtTags.hasKey(PROFILE_INSTANCE_TAG)) {
-            try {
-                recipeProfileInstance = UUID.fromString(nbtTags.getString(PROFILE_INSTANCE_TAG));
-            } catch (IllegalArgumentException ignored) {
-                recipeProfileInstance = null;
-            }
-        }
+        recipeProfileOwner = readUuid(nbtTags, PROFILE_OWNER_TAG);
+        recipeProfileInstance = readUuid(nbtTags, PROFILE_INSTANCE_TAG);
         if (nbtTags.hasKey(PROFILE_GLOBAL_SLOT_TAG)) {
             recipeProfileGlobalSlot = clampGlobalProfileSlot(nbtTags.getInteger(PROFILE_GLOBAL_SLOT_TAG));
         } else {
@@ -284,13 +272,7 @@ public class AEUpgradeNode {
         }
         recipeProfileIndividual = nbtTags.getBoolean(PROFILE_INDIVIDUAL_TAG);
         recipeProfileIndividualInitialized = nbtTags.getBoolean(PROFILE_INDIVIDUAL_INITIALIZED_TAG);
-        if (nbtTags.hasKey(AUTO_PROFILE_INSTANCE_TAG)) {
-            try {
-                autoProcessingRecipeProfileInstance = UUID.fromString(nbtTags.getString(AUTO_PROFILE_INSTANCE_TAG));
-            } catch (IllegalArgumentException ignored) {
-                autoProcessingRecipeProfileInstance = null;
-            }
-        }
+        autoProcessingRecipeProfileInstance = readUuid(nbtTags, AUTO_PROFILE_INSTANCE_TAG);
         if (nbtTags.hasKey(AUTO_PROFILE_GLOBAL_SLOT_TAG)) {
             autoProcessingRecipeProfileGlobalSlot = clampGlobalProfileSlot(nbtTags.getInteger(AUTO_PROFILE_GLOBAL_SLOT_TAG));
         } else {
@@ -315,15 +297,21 @@ public class AEUpgradeNode {
         proxy.writeToNBT(nbtTags);
         if (recipeProfileOwner != null) {
             nbtTags.setString(PROFILE_OWNER_TAG, recipeProfileOwner.toString());
+        } else {
+            nbtTags.removeTag(PROFILE_OWNER_TAG);
         }
         if (recipeProfileInstance != null) {
             nbtTags.setString(PROFILE_INSTANCE_TAG, recipeProfileInstance.toString());
+        } else {
+            nbtTags.removeTag(PROFILE_INSTANCE_TAG);
         }
         nbtTags.setInteger(PROFILE_GLOBAL_SLOT_TAG, recipeProfileGlobalSlot);
         nbtTags.setBoolean(PROFILE_INDIVIDUAL_TAG, recipeProfileIndividual);
         nbtTags.setBoolean(PROFILE_INDIVIDUAL_INITIALIZED_TAG, recipeProfileIndividualInitialized);
         if (autoProcessingRecipeProfileInstance != null) {
             nbtTags.setString(AUTO_PROFILE_INSTANCE_TAG, autoProcessingRecipeProfileInstance.toString());
+        } else {
+            nbtTags.removeTag(AUTO_PROFILE_INSTANCE_TAG);
         }
         nbtTags.setInteger(AUTO_PROFILE_GLOBAL_SLOT_TAG, autoProcessingRecipeProfileGlobalSlot);
         nbtTags.setBoolean(AUTO_PROFILE_INDIVIDUAL_TAG, autoProcessingRecipeProfileIndividual);
@@ -1389,6 +1377,18 @@ public class AEUpgradeNode {
         cachedNetworkUsable = false;
         cachedActionableNode = null;
         clearNetworkTopologyCache();
+    }
+
+    @Nullable
+    private static UUID readUuid(NBTTagCompound nbtTags, String key) {
+        if (!nbtTags.hasKey(key)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(nbtTags.getString(key));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @Nullable

@@ -29,7 +29,9 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class AEExposedRecipe implements ICraftingPatternDetails {
@@ -42,6 +44,8 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
     private final ItemStack output;
     private final IAEItemStack[] aeInputs;
     private final IAEItemStack[] aeOutputs;
+    private final IAEItemStack[] aeCondensedInputs;
+    private final IAEItemStack[] aeCondensedOutputs;
     private final AEPatternInput patternInput;
     private final ItemStack patternStack;
     private final AERecipeKey recipeKey;
@@ -99,6 +103,8 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
         for (int i = 0; i < this.outputs.size(); i++) {
             aeOutputs[i] = toAEStack(this.outputs.get(i));
         }
+        aeCondensedInputs = condenseStacks(aeInputs);
+        aeCondensedOutputs = condenseStacks(aeOutputs);
         patternInput = new AEPatternInput(this.inputs);
         patternStack = createPatternStack(this.inputs, this.outputs, recipeKey);
         this.recipeKey = recipeKey;
@@ -285,12 +291,12 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
 
     @Override
     public IAEItemStack[] getCondensedInputs() {
-        return copyStacks(aeInputs);
+        return copyStacks(aeCondensedInputs);
     }
 
     @Override
     public IAEItemStack[] getCondensedOutputs() {
-        return copyStacks(aeOutputs);
+        return copyStacks(aeCondensedOutputs);
     }
 
     @Override
@@ -304,6 +310,25 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
             copy[i] = stacks[i] == null ? null : stacks[i].copy();
         }
         return copy;
+    }
+
+    /**
+     * 合并相同 AE 资源，避免合成 CPU 对重复输入分别模拟后低估实际需求量。
+     */
+    private static IAEItemStack[] condenseStacks(IAEItemStack[] stacks) {
+        Map<IAEItemStack, IAEItemStack> condensed = new LinkedHashMap<>();
+        for (IAEItemStack stack : stacks) {
+            if (stack == null) {
+                continue;
+            }
+            IAEItemStack existing = condensed.get(stack);
+            if (existing == null) {
+                condensed.put(stack, stack.copy());
+            } else {
+                existing.add(stack);
+            }
+        }
+        return condensed.values().toArray(new IAEItemStack[condensed.size()]);
     }
 
     @Override

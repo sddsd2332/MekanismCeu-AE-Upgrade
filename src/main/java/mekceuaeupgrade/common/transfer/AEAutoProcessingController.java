@@ -62,6 +62,12 @@ public final class AEAutoProcessingController {
         if (!inputPlan.extract(node)) {
             return false;
         }
+        if (!inputPlan.canAcceptOutputs(node)) {
+            inputPlan.rollback(node);
+            AEUpgradeDebug.log(host, "auto processing rolled back because AE cannot accept outputs={}",
+                  AEUpgradeDebug.outputStacks(acceptedRecipe));
+            return false;
+        }
         if (!host.acceptAEItemInputs(acceptedRecipe, legacyInputs)) {
             inputPlan.rollback(node);
             AEUpgradeDebug.log(host, "auto processing rolled back inputs={} outputs={}",
@@ -86,7 +92,8 @@ public final class AEAutoProcessingController {
         if (!host.canAcceptAEItemInputs(recipe, legacyInputs)) {
             return null;
         }
-        if (!inputPlan.canAcceptOutputs(node)) {
+        // 自引用路线可能通过抽取输入释放恰好足够的 AE 空间，因此延后到真实抽取后再检查。
+        if (!recipe.hasSelfReferentialOutput() && !inputPlan.canAcceptOutputs(node)) {
             return null;
         }
         return new PreparedRecipe(recipe, inputPlan, legacyInputs);

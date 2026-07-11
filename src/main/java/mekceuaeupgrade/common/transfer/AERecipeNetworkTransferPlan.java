@@ -8,6 +8,7 @@ import mekceuaeupgrade.common.recipe.route.AERecipeRouteStack;
 import appeng.api.config.Actionable;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.api.storage.data.IAEItemStack;
+import appeng.api.storage.data.IAEStack;
 import appeng.fluids.util.AEFluidStack;
 import appeng.util.item.AEItemStack;
 import mekanism.api.gas.GasStack;
@@ -79,19 +80,41 @@ public final class AERecipeNetworkTransferPlan {
      * 在拉取输入前预检 AE 是否能接收该配方的主要输出。
      *
      * @param node 当前机器的 AE 网络节点
-     * @param recipe 暴露给 AE 的配方
      * @return 输出可以完整写入 AE 时返回 true
      */
     public boolean canAcceptOutputs(AEUpgradeNode node) {
         if (node == null || !node.canUseNetwork()) {
             return false;
         }
-        for (NetworkOutput output : outputs) {
-            if (!output.canAccept(node)) {
+        for (int i = 0; i < outputs.size(); i++) {
+            NetworkOutput output = outputs.get(i);
+            if (hasEquivalentOutputBefore(i, output)) {
+                continue;
+            }
+            long total = 0;
+            for (int j = i; j < outputs.size(); j++) {
+                NetworkOutput candidate = outputs.get(j);
+                if (output.isSameResource(candidate)) {
+                    total = addAmount(total, candidate.amount());
+                    if (total < 0) {
+                        return false;
+                    }
+                }
+            }
+            if (!output.canAccept(node, total)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean hasEquivalentOutputBefore(int index, NetworkOutput output) {
+        for (int i = 0; i < index; i++) {
+            if (output.isSameResource(outputs.get(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -118,12 +141,39 @@ public final class AERecipeNetworkTransferPlan {
         if (node == null || !node.canUseNetwork()) {
             return false;
         }
-        for (ExtractedInput input : inputs) {
-            if (!input.canExtract(node)) {
+        for (int i = 0; i < inputs.size(); i++) {
+            ExtractedInput input = inputs.get(i);
+            if (hasEquivalentInputBefore(i, input)) {
+                continue;
+            }
+            long total = 0;
+            for (int j = i; j < inputs.size(); j++) {
+                ExtractedInput candidate = inputs.get(j);
+                if (input.isSameResource(candidate)) {
+                    total = addAmount(total, candidate.amount());
+                    if (total < 0) {
+                        return false;
+                    }
+                }
+            }
+            if (!input.canExtract(node, total)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean hasEquivalentInputBefore(int index, ExtractedInput input) {
+        for (int i = 0; i < index; i++) {
+            if (input.isSameResource(inputs.get(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long addAmount(long current, long amount) {
+        return current < 0 || amount <= 0 || Long.MAX_VALUE - current < amount ? -1 : current + amount;
     }
 
     /**
@@ -257,7 +307,11 @@ public final class AERecipeNetworkTransferPlan {
 
     private abstract static class NetworkOutput {
 
-        abstract boolean canAccept(AEUpgradeNode node);
+        abstract boolean isSameResource(NetworkOutput other);
+
+        abstract long amount();
+
+        abstract boolean canAccept(AEUpgradeNode node, long amount);
     }
 
     private static final class ItemOutput extends NetworkOutput {
@@ -269,8 +323,23 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canAccept(AEUpgradeNode node) {
-            return node.injectItem(output.copy(), Actionable.SIMULATE).isEmpty();
+        boolean isSameResource(NetworkOutput other) {
+            return other instanceof ItemOutput itemOutput && ItemHandlerHelper.canItemStacksStack(output, itemOutput.output);
+        }
+
+        @Override
+        long amount() {
+            return output.getCount();
+        }
+
+        @Override
+        boolean canAccept(AEUpgradeNode node, long amount) {
+            if (amount <= 0 || amount > Integer.MAX_VALUE) {
+                return false;
+            }
+            ItemStack combined = output.copy();
+            combined.setCount((int) amount);
+            return node.injectItem(combined, Actionable.SIMULATE).isEmpty();
         }
     }
 
@@ -283,8 +352,23 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canAccept(AEUpgradeNode node) {
-            GasStack remainder = node.injectGas(output.copy(), Actionable.SIMULATE);
+        boolean isSameResource(NetworkOutput other) {
+            return other instanceof GasOutput gasOutput && output.isGasEqual(gasOutput.output);
+        }
+
+        @Override
+        long amount() {
+            return output.amount;
+        }
+
+        @Override
+        boolean canAccept(AEUpgradeNode node, long amount) {
+            if (amount <= 0 || amount > Integer.MAX_VALUE) {
+                return false;
+            }
+            GasStack combined = output.copy();
+            combined.amount = (int) amount;
+            GasStack remainder = node.injectGas(combined, Actionable.SIMULATE);
             return remainder == null || remainder.amount <= 0;
         }
     }
@@ -298,8 +382,23 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canAccept(AEUpgradeNode node) {
-            FluidStack remainder = node.injectFluid(output.copy(), Actionable.SIMULATE);
+        boolean isSameResource(NetworkOutput other) {
+            return other instanceof FluidOutput fluidOutput && output.isFluidEqual(fluidOutput.output);
+        }
+
+        @Override
+        long amount() {
+            return output.amount;
+        }
+
+        @Override
+        boolean canAccept(AEUpgradeNode node, long amount) {
+            if (amount <= 0 || amount > Integer.MAX_VALUE) {
+                return false;
+            }
+            FluidStack combined = output.copy();
+            combined.amount = (int) amount;
+            FluidStack remainder = node.injectFluid(combined, Actionable.SIMULATE);
             return remainder == null || remainder.amount <= 0;
         }
     }
@@ -328,7 +427,11 @@ public final class AERecipeNetworkTransferPlan {
         /**
          * 模拟检查该输入是否可从 AE 抽取。
          */
-        abstract boolean canExtract(AEUpgradeNode node);
+        abstract boolean isSameResource(ExtractedInput other);
+
+        abstract long amount();
+
+        abstract boolean canExtract(AEUpgradeNode node, long amount);
 
         /**
          * 真实抽取该输入。
@@ -365,8 +468,23 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canExtract(AEUpgradeNode node) {
-            return node.hasAvailableItem(availabilityRequest);
+        boolean isSameResource(ExtractedInput other) {
+            return other instanceof ItemInput itemInput && ItemHandlerHelper.canItemStacksStack(request, itemInput.request);
+        }
+
+        @Override
+        long amount() {
+            return request.getCount();
+        }
+
+        @Override
+        boolean canExtract(AEUpgradeNode node, long amount) {
+            if (availabilityRequest == null || amount <= 0) {
+                return false;
+            }
+            IAEItemStack combined = availabilityRequest.copy();
+            combined.setStackSize(amount);
+            return node.hasAvailableItem(combined);
         }
 
         @Override
@@ -418,8 +536,24 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canExtract(AEUpgradeNode node) {
-            return node.hasAvailableGas(availabilityRequest);
+        boolean isSameResource(ExtractedInput other) {
+            return other instanceof GasInput gasInput && request.isGasEqual(gasInput.request);
+        }
+
+        @Override
+        long amount() {
+            return request.amount;
+        }
+
+        @Override
+        @SuppressWarnings("rawtypes")
+        boolean canExtract(AEUpgradeNode node, long amount) {
+            if (!(availabilityRequest instanceof IAEStack requestStack) || amount <= 0) {
+                return false;
+            }
+            IAEStack combined = requestStack.copy();
+            combined.setStackSize(amount);
+            return node.hasAvailableGas(combined);
         }
 
         @Override
@@ -471,8 +605,23 @@ public final class AERecipeNetworkTransferPlan {
         }
 
         @Override
-        boolean canExtract(AEUpgradeNode node) {
-            return node.hasAvailableFluid(availabilityRequest);
+        boolean isSameResource(ExtractedInput other) {
+            return other instanceof FluidInput fluidInput && request.isFluidEqual(fluidInput.request);
+        }
+
+        @Override
+        long amount() {
+            return request.amount;
+        }
+
+        @Override
+        boolean canExtract(AEUpgradeNode node, long amount) {
+            if (availabilityRequest == null || amount <= 0) {
+                return false;
+            }
+            IAEFluidStack combined = availabilityRequest.copy();
+            combined.setStackSize(amount);
+            return node.hasAvailableFluid(combined);
         }
 
         @Override

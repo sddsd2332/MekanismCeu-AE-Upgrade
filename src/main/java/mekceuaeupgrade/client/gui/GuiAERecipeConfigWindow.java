@@ -486,12 +486,15 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         boolean ctrlDown = GuiScreen.isCtrlKeyDown();
         toggleButton.active = ctrlDown ? hasModifiableRoute(product) : hasRoute && route.isModifiable();
         if (selectionFocus == SelectionFocus.PRODUCT) {
-            int productIndex = getProductIndex(product);
-            upButton.active = hasModifiableRoute(product) && productIndex > 0;
-            downButton.active = hasModifiableRoute(product) && productIndex >= 0 && productIndex < snapshot.getProducts().size() - 1;
+            int productIndex = getModifiableProductIndex(product);
+            int productCount = getModifiableProductCount();
+            upButton.active = productIndex > 0;
+            downButton.active = productIndex >= 0 && productIndex < productCount - 1;
         } else {
-            upButton.active = hasRoute && route.isModifiable() && route.getOrder() > 0;
-            downButton.active = hasRoute && route.isModifiable() && product != null && route.getOrder() < product.getRoutes().size() - 1;
+            int routeIndex = getModifiableRouteIndex(product, route);
+            int routeCount = getModifiableRouteCount(product);
+            upButton.active = routeIndex > 0;
+            downButton.active = routeIndex >= 0 && routeIndex < routeCount - 1;
         }
         resetProductButton.active = hasModifiableRoute(product);
         resetAllButton.active = hasAnyModifiableRoute();
@@ -562,17 +565,61 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         return foundModifiable;
     }
 
-    private int getProductIndex(@Nullable Product product) {
+    private int getModifiableProductIndex(@Nullable Product product) {
         if (product == null) {
             return -1;
         }
-        List<Product> products = snapshot.getProducts();
-        for (int i = 0; i < products.size(); i++) {
-            if (product.getOutputKey().equals(products.get(i).getOutputKey())) {
-                return i;
+        int index = 0;
+        for (Product candidate : snapshot.getProducts()) {
+            if (!hasModifiableRoute(candidate)) {
+                continue;
             }
+            if (product.getOutputKey().equals(candidate.getOutputKey())) {
+                return index;
+            }
+            index++;
         }
         return -1;
+    }
+
+    private int getModifiableProductCount() {
+        int count = 0;
+        for (Product product : snapshot.getProducts()) {
+            if (hasModifiableRoute(product)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int getModifiableRouteIndex(@Nullable Product product, @Nullable Route route) {
+        if (product == null || route == null || !route.isModifiable()) {
+            return -1;
+        }
+        int index = 0;
+        for (Route candidate : product.getRoutes()) {
+            if (!candidate.isModifiable()) {
+                continue;
+            }
+            if (route.getRouteKey().equals(candidate.getRouteKey())) {
+                return index;
+            }
+            index++;
+        }
+        return -1;
+    }
+
+    private int getModifiableRouteCount(@Nullable Product product) {
+        if (product == null) {
+            return 0;
+        }
+        int count = 0;
+        for (Route route : product.getRoutes()) {
+            if (route.isModifiable()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Nullable
