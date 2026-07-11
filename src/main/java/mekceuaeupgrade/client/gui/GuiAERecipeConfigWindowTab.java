@@ -1,13 +1,15 @@
 package mekceuaeupgrade.client.gui;
 
 import mekanism.client.SpecialColors;
+import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.tab.window.GuiWindowCreatorTab;
 import mekanism.client.gui.element.window.GuiWindow;
+import mekanism.client.render.MekanismRenderer;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
-import mekanism.common.util.MekanismUtils;
 import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
@@ -18,7 +20,11 @@ import java.util.function.Supplier;
 
 public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityContainerBlock, GuiAERecipeConfigWindowTab> {
 
-    private static final ResourceLocation AE_RECIPE_CONFIG = MekanismUtils.getResource(MekanismUtils.ResourceType.TEXTURE_ITEMS, "craftingformulaencoded.png");
+    private static final ResourceLocation AE_CRAFTING_CONFIG = MEKCeuAEUpgrade.rl("textures/items/aecraftingupgrade.png");
+    private static final ResourceLocation AE_AUTO_PROCESSING_CONFIG = MEKCeuAEUpgrade.rl("textures/items/aeautoprocessingupgrade.png");
+    private static final ResourceLocation AE_WIRELESS_OVERLAY = MEKCeuAEUpgrade.rl("textures/items/wifi.png");
+    private static final int TAB_ICON_SIZE = 14;
+    private static final int ITEM_TEXTURE_SIZE = 16;
 
     protected final AERecipeConfigType configType;
     private boolean windowOpen;
@@ -29,10 +35,34 @@ public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityCo
 
     protected GuiAERecipeConfigWindowTab(IGuiWrapper gui, TileEntityContainerBlock tile, Supplier<GuiAERecipeConfigWindowTab> elementSupplier,
           AERecipeConfigType configType, int y) {
-        super(AE_RECIPE_CONFIG, gui, tile, gui.getWidth() + 24, y, 26, 18, false, elementSupplier);
+        super(getTabIcon(configType), gui, tile, gui.getWidth() + 24, y, 26, 18, false, elementSupplier);
         this.configType = configType;
         visible = canOpen(tile, configType);
         active = visible;
+    }
+
+    private static ResourceLocation getTabIcon(AERecipeConfigType configType) {
+        return configType == AERecipeConfigType.AUTO_PROCESSING ? AE_AUTO_PROCESSING_CONFIG : AE_CRAFTING_CONFIG;
+    }
+
+    @Override
+    protected void drawBackgroundOverlay() {
+        int iconX = getButtonX() + (innerWidth - TAB_ICON_SIZE) / 2;
+        int iconY = getButtonY() + (innerHeight - TAB_ICON_SIZE) / 2;
+        MekanismRenderer.bindTexture(getOverlay());
+        GuiUtils.blit(iconX, iconY, TAB_ICON_SIZE, TAB_ICON_SIZE, 0, 0, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE);
+        if (hasWirelessUpgrade()) {
+            MekanismRenderer.bindTexture(AE_WIRELESS_OVERLAY);
+            GuiUtils.blit(iconX, iconY, TAB_ICON_SIZE, TAB_ICON_SIZE, 0, 0, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE);
+        }
+        MekanismRenderer.resetColor();
+    }
+
+    private boolean hasWirelessUpgrade() {
+        if (!(dataSource instanceof IAEUpgradeHost host)) {
+            return false;
+        }
+        return configType == AERecipeConfigType.AUTO_PROCESSING ? host.hasAEWirelessAutoProcessingUpgrade() : host.hasAEWirelessCraftingUpgrade();
     }
 
     public static boolean shouldAdd(TileEntityContainerBlock tile) {
