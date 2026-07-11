@@ -484,28 +484,29 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
         boolean hasProduct = product != null;
         boolean hasRoute = route != null;
         boolean ctrlDown = GuiScreen.isCtrlKeyDown();
-        toggleButton.active = ctrlDown ? hasModifiableRoute(product) : hasRoute && route.isModifiable();
+        boolean editable = snapshot.isEditable();
+        toggleButton.active = editable && (ctrlDown ? hasModifiableRoute(product) : hasRoute && route.isModifiable());
         if (selectionFocus == SelectionFocus.PRODUCT) {
             int productIndex = getModifiableProductIndex(product);
             int productCount = getModifiableProductCount();
-            upButton.active = productIndex > 0;
-            downButton.active = productIndex >= 0 && productIndex < productCount - 1;
+            upButton.active = editable && productIndex > 0;
+            downButton.active = editable && productIndex >= 0 && productIndex < productCount - 1;
         } else {
             int routeIndex = getModifiableRouteIndex(product, route);
             int routeCount = getModifiableRouteCount(product);
-            upButton.active = routeIndex > 0;
-            downButton.active = routeIndex >= 0 && routeIndex < routeCount - 1;
+            upButton.active = editable && routeIndex > 0;
+            downButton.active = editable && routeIndex >= 0 && routeIndex < routeCount - 1;
         }
-        resetProductButton.active = hasModifiableRoute(product);
-        resetAllButton.active = hasAnyModifiableRoute();
+        resetProductButton.active = editable && hasModifiableRoute(product);
+        resetAllButton.active = editable && hasAnyModifiableRoute();
         productFilterButton.active = !snapshot.isEmpty();
-        globalAmountField.active = isConfigAvailable() && hasAnyModifiableRoute();
-        routeAmountField.active = hasRoute && route.isModifiable();
-        profileModeButton.active = isConfigAvailable() && !snapshot.isEmpty();
+        globalAmountField.active = editable && isConfigAvailable() && hasAnyModifiableRoute();
+        routeAmountField.active = editable && hasRoute && route.isModifiable();
+        profileModeButton.active = editable && isConfigAvailable() && !snapshot.isEmpty();
         routeFilterModeButton.visible = configType.isRouteFilterMutable() && !snapshot.isEmpty();
-        routeFilterModeButton.active = configType.isRouteFilterMutable() && isConfigAvailable() && !snapshot.isEmpty();
+        routeFilterModeButton.active = editable && configType.isRouteFilterMutable() && isConfigAvailable() && !snapshot.isEmpty();
         globalProfileButton.visible = !snapshot.isIndividualProfile() && !snapshot.isEmpty();
-        globalProfileButton.active = isConfigAvailable() && !snapshot.isEmpty() && !snapshot.isIndividualProfile();
+        globalProfileButton.active = editable && isConfigAvailable() && !snapshot.isEmpty() && !snapshot.isIndividualProfile();
         updateProfileButtonLayout();
         productFilterButton.setMessage(productFilterMode.getLabel().translate());
         toggleButton.setMessage(ctrlDown ? AELang.AE_RECIPE_CONFIG_DISABLE_PRODUCT.translate() :
@@ -739,7 +740,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void sendRouteAction(RecipeConfigPacket packetType, int direction) {
-        if (!isConfigAvailable()) {
+        if (!canEditConfiguration()) {
             return;
         }
         Product product = getSelectedProduct();
@@ -782,7 +783,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void sendProductAction(RecipeConfigPacket packetType, int direction) {
-        if (!isConfigAvailable()) {
+        if (!canEditConfiguration()) {
             return;
         }
         String outputKey = selectedOutputKey == null ? "" : selectedOutputKey;
@@ -790,24 +791,27 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void sendProfileModeAction() {
-        if (isConfigAvailable() && !snapshot.isEmpty()) {
+        if (canEditConfiguration() && !snapshot.isEmpty()) {
             MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.TOGGLE_PROFILE_MODE, "", "", 0));
         }
     }
 
     private void sendRouteFilterModeAction() {
-        if (configType.isRouteFilterMutable() && isConfigAvailable() && !snapshot.isEmpty()) {
+        if (configType.isRouteFilterMutable() && canEditConfiguration() && !snapshot.isEmpty()) {
             MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.TOGGLE_ROUTE_FILTER_MODE, "", "", 0));
         }
     }
 
     private void sendGlobalProfileAction(int direction) {
-        if (isConfigAvailable() && !snapshot.isEmpty() && !snapshot.isIndividualProfile()) {
+        if (canEditConfiguration() && !snapshot.isEmpty() && !snapshot.isIndividualProfile()) {
             MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.CYCLE_GLOBAL_PROFILE, "", "", direction));
         }
     }
 
     private void sendResetAllAction() {
+        if (!canEditConfiguration()) {
+            return;
+        }
         if (GuiScreen.isShiftKeyDown()) {
             MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.SET_ALL_ROUTES_ENABLED, "", "",
                   areAllRoutesEnabled() ? 0 : 1));
@@ -817,7 +821,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void sendGlobalCraftAmountAction() {
-        if (!isConfigAvailable() || snapshot.isEmpty()) {
+        if (!canEditConfiguration() || snapshot.isEmpty()) {
             return;
         }
         int amount = parseCraftAmount(globalAmountField.getText(), AERecipeProfile.DEFAULT_CRAFT_AMOUNT, snapshot.getMaxCraftAmount());
@@ -825,7 +829,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
     }
 
     private void sendRouteCraftAmountAction() {
-        if (!isConfigAvailable()) {
+        if (!canEditConfiguration()) {
             return;
         }
         Product product = getSelectedProduct();
@@ -841,6 +845,10 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             MEKCeuAEUpgrade.packetHandler.sendToServer(new AERecipeConfigMessage(coord, configType, RecipeConfigPacket.SET_ROUTE_CRAFT_AMOUNT,
                   product.getOutputKey(), route.getRouteKey(), 0, amount));
         }
+    }
+
+    private boolean canEditConfiguration() {
+        return snapshot.isEditable() && isConfigAvailable();
     }
 
     private int parseCraftAmount(String text, int fallback, int maxCraftAmount) {
@@ -933,7 +941,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            if (button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
+            if (canEditConfiguration() && button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
                 Product product = getHoveredProduct((int) mouseY);
                 if (product != null && hasModifiableRoute(product)) {
                     selectProduct(product);
@@ -1098,7 +1106,7 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            if (button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
+            if (canEditConfiguration() && button == 1 && GuiScreen.isShiftKeyDown() && isMouseOverRows(mouseX, mouseY)) {
                 Route route = getHoveredRoute((int) mouseY);
                 if (route != null && route.isModifiable()) {
                     selectRoute(route);

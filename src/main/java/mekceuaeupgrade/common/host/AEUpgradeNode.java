@@ -2,6 +2,7 @@ package mekceuaeupgrade.common.host;
 
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.config.AERecipeConfigType;
+import mekceuaeupgrade.common.config.AERecipeProfile;
 import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
@@ -73,9 +74,12 @@ public class AEUpgradeNode {
 
     private static final String PROFILE_OWNER_TAG = "aeRecipeProfileOwner";
     private static final String PROFILE_INDIVIDUAL_TAG = "aeRecipeProfileIndividual";
-    private static final String PROFILE_INDIVIDUAL_INITIALIZED_TAG = "aeRecipeProfileIndividualInitialized";
+    private static final String PROFILE_BLACKLIST_INDIVIDUAL_INITIALIZED_TAG = "aeRecipeProfileBlacklistIndividualInitialized";
+    private static final String PROFILE_WHITELIST_INDIVIDUAL_INITIALIZED_TAG = "aeRecipeProfileWhitelistIndividualInitialized";
+    private static final String LEGACY_PROFILE_INDIVIDUAL_INITIALIZED_TAG = "aeRecipeProfileIndividualInitialized";
     private static final String PROFILE_INSTANCE_TAG = "aeRecipeProfileInstance";
     private static final String PROFILE_GLOBAL_SLOT_TAG = "aeRecipeProfileGlobalSlot";
+    private static final String PROFILE_FILTER_MODE_TAG = "aeRecipeProfileFilterMode";
     private static final String AUTO_PROFILE_INDIVIDUAL_TAG = "aeAutoProcessingRecipeProfileIndividual";
     private static final String AUTO_PROFILE_INDIVIDUAL_INITIALIZED_TAG = "aeAutoProcessingRecipeProfileIndividualInitialized";
     private static final String AUTO_PROFILE_INSTANCE_TAG = "aeAutoProcessingRecipeProfileInstance";
@@ -111,8 +115,10 @@ public class AEUpgradeNode {
     private UUID autoProcessingRecipeProfileInstance;
     private int recipeProfileGlobalSlot = MIN_GLOBAL_PROFILE_SLOT;
     private int autoProcessingRecipeProfileGlobalSlot = MIN_GLOBAL_PROFILE_SLOT;
+    private AERecipeProfile.RouteFilterMode recipeProfileFilterMode = AERecipeProfile.RouteFilterMode.BLACKLIST;
     private boolean recipeProfileIndividual;
-    private boolean recipeProfileIndividualInitialized;
+    private boolean recipeProfileBlacklistIndividualInitialized;
+    private boolean recipeProfileWhitelistIndividualInitialized;
     private boolean autoProcessingRecipeProfileIndividual;
     private boolean autoProcessingRecipeProfileIndividualInitialized;
     private boolean ready;
@@ -271,7 +277,16 @@ public class AEUpgradeNode {
             recipeProfileGlobalSlot = MIN_GLOBAL_PROFILE_SLOT;
         }
         recipeProfileIndividual = nbtTags.getBoolean(PROFILE_INDIVIDUAL_TAG);
-        recipeProfileIndividualInitialized = nbtTags.getBoolean(PROFILE_INDIVIDUAL_INITIALIZED_TAG);
+        recipeProfileFilterMode = nbtTags.hasKey(PROFILE_FILTER_MODE_TAG) ?
+              AERecipeProfile.RouteFilterMode.fromName(nbtTags.getString(PROFILE_FILTER_MODE_TAG)) : AERecipeProfile.RouteFilterMode.BLACKLIST;
+        recipeProfileBlacklistIndividualInitialized = nbtTags.getBoolean(PROFILE_BLACKLIST_INDIVIDUAL_INITIALIZED_TAG);
+        recipeProfileWhitelistIndividualInitialized = nbtTags.getBoolean(PROFILE_WHITELIST_INDIVIDUAL_INITIALIZED_TAG);
+        if (recipeProfileIndividual && !nbtTags.hasKey(PROFILE_BLACKLIST_INDIVIDUAL_INITIALIZED_TAG) &&
+            !nbtTags.hasKey(PROFILE_WHITELIST_INDIVIDUAL_INITIALIZED_TAG)) {
+            // 旧配置文件不迁移，但保留机器已处于单机模式这一状态，避免新配置随后被空全局配置覆盖。
+            recipeProfileBlacklistIndividualInitialized = recipeProfileFilterMode == AERecipeProfile.RouteFilterMode.BLACKLIST;
+            recipeProfileWhitelistIndividualInitialized = recipeProfileFilterMode == AERecipeProfile.RouteFilterMode.WHITELIST;
+        }
         autoProcessingRecipeProfileInstance = readUuid(nbtTags, AUTO_PROFILE_INSTANCE_TAG);
         if (nbtTags.hasKey(AUTO_PROFILE_GLOBAL_SLOT_TAG)) {
             autoProcessingRecipeProfileGlobalSlot = clampGlobalProfileSlot(nbtTags.getInteger(AUTO_PROFILE_GLOBAL_SLOT_TAG));
@@ -307,7 +322,10 @@ public class AEUpgradeNode {
         }
         nbtTags.setInteger(PROFILE_GLOBAL_SLOT_TAG, recipeProfileGlobalSlot);
         nbtTags.setBoolean(PROFILE_INDIVIDUAL_TAG, recipeProfileIndividual);
-        nbtTags.setBoolean(PROFILE_INDIVIDUAL_INITIALIZED_TAG, recipeProfileIndividualInitialized);
+        nbtTags.setString(PROFILE_FILTER_MODE_TAG, recipeProfileFilterMode.name());
+        nbtTags.setBoolean(PROFILE_BLACKLIST_INDIVIDUAL_INITIALIZED_TAG, recipeProfileBlacklistIndividualInitialized);
+        nbtTags.setBoolean(PROFILE_WHITELIST_INDIVIDUAL_INITIALIZED_TAG, recipeProfileWhitelistIndividualInitialized);
+        nbtTags.removeTag(LEGACY_PROFILE_INDIVIDUAL_INITIALIZED_TAG);
         if (autoProcessingRecipeProfileInstance != null) {
             nbtTags.setString(AUTO_PROFILE_INSTANCE_TAG, autoProcessingRecipeProfileInstance.toString());
         } else {
@@ -395,11 +413,48 @@ public class AEUpgradeNode {
     }
 
     public boolean isRecipeProfileIndividualInitialized(AERecipeConfigType type) {
-        return type == AERecipeConfigType.AUTO_PROCESSING ? autoProcessingRecipeProfileIndividualInitialized : recipeProfileIndividualInitialized;
+        return isRecipeProfileIndividualInitialized(type, getRecipeProfileFilterMode(type));
+    }
+
+    /**
+     * 判断指定配置类型和过滤模式的单机配置是否已经从全局配置初始化。
+     */
+    public boolean isRecipeProfileIndividualInitialized(AERecipeConfigType type, AERecipeProfile.RouteFilterMode filterMode) {
+        if (type == AERecipeConfigType.AUTO_PROCESSING) {
+            return autoProcessingRecipeProfileIndividualInitialized;
+        }
+        return filterMode == AERecipeProfile.RouteFilterMode.WHITELIST ? recipeProfileWhitelistIndividualInitialized :
+              recipeProfileBlacklistIndividualInitialized;
     }
 
     public int getRecipeProfileGlobalSlot(AERecipeConfigType type) {
         return type == AERecipeConfigType.AUTO_PROCESSING ? autoProcessingRecipeProfileGlobalSlot : recipeProfileGlobalSlot;
+    }
+
+    /**
+     * 获取指定配置类型当前选择的路线过滤模式。自动处理固定使用白名单语义。
+     */
+    public AERecipeProfile.RouteFilterMode getRecipeProfileFilterMode(AERecipeConfigType type) {
+        return type == AERecipeConfigType.AUTO_PROCESSING ? AERecipeProfile.RouteFilterMode.WHITELIST : recipeProfileFilterMode;
+    }
+
+    /**
+     * 切换合成配置当前使用的黑名单或白名单配置集。
+     */
+    public boolean setRecipeProfileFilterMode(AERecipeConfigType type, AERecipeProfile.RouteFilterMode filterMode) {
+        if (type != AERecipeConfigType.CRAFTING) {
+            return false;
+        }
+        AERecipeProfile.RouteFilterMode normalized = filterMode == null ? AERecipeProfile.RouteFilterMode.BLACKLIST : filterMode;
+        if (recipeProfileFilterMode == normalized) {
+            return false;
+        }
+        recipeProfileFilterMode = normalized;
+        if (host instanceof TileEntity tile) {
+            tile.markDirty();
+        }
+        invalidateRecipeCache();
+        return true;
     }
 
     public boolean cycleRecipeProfileGlobalSlot(AERecipeConfigType type, int direction) {
@@ -453,13 +508,22 @@ public class AEUpgradeNode {
     }
 
     public void markRecipeProfileIndividualInitialized(AERecipeConfigType type) {
-        if (isRecipeProfileIndividualInitialized(type)) {
+        markRecipeProfileIndividualInitialized(type, getRecipeProfileFilterMode(type));
+    }
+
+    /**
+     * 标记指定配置类型和过滤模式的单机配置已经完成初始化。
+     */
+    public void markRecipeProfileIndividualInitialized(AERecipeConfigType type, AERecipeProfile.RouteFilterMode filterMode) {
+        if (isRecipeProfileIndividualInitialized(type, filterMode)) {
             return;
         }
         if (type == AERecipeConfigType.AUTO_PROCESSING) {
             autoProcessingRecipeProfileIndividualInitialized = true;
+        } else if (filterMode == AERecipeProfile.RouteFilterMode.WHITELIST) {
+            recipeProfileWhitelistIndividualInitialized = true;
         } else {
-            recipeProfileIndividualInitialized = true;
+            recipeProfileBlacklistIndividualInitialized = true;
         }
         if (host instanceof TileEntity tile) {
             tile.markDirty();

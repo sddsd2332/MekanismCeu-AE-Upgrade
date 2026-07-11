@@ -29,15 +29,17 @@ public class AERecipeConfigSnapshot {
     private static final String ROUTE_CRAFT_AMOUNT = "routeCraftAmount";
     private static final String ROUTE_CRAFT_AMOUNT_OVERRIDE = "routeCraftAmountOverride";
     private static final String MODIFIABLE = "modifiable";
+    private static final String EDITABLE = "editable";
 
     public static final AERecipeConfigSnapshot EMPTY = new AERecipeConfigSnapshot(Collections.emptyList(), false, 1, AERecipeProfile.DEFAULT_CRAFT_AMOUNT,
-          AERecipeProfile.RouteFilterMode.BLACKLIST);
+          AERecipeProfile.RouteFilterMode.BLACKLIST, false);
 
     private final List<Product> products;
     private final boolean individualProfile;
     private final int globalProfileSlot;
     private final AERecipeProfile.RouteFilterMode routeFilterMode;
     private final int craftAmount;
+    private final boolean editable;
 
     public AERecipeConfigSnapshot(List<Product> products) {
         this(products, false, 1, AERecipeProfile.DEFAULT_CRAFT_AMOUNT);
@@ -57,11 +59,17 @@ public class AERecipeConfigSnapshot {
 
     public AERecipeConfigSnapshot(List<Product> products, boolean individualProfile, int globalProfileSlot, int craftAmount,
           AERecipeProfile.RouteFilterMode routeFilterMode) {
+        this(products, individualProfile, globalProfileSlot, craftAmount, routeFilterMode, true);
+    }
+
+    public AERecipeConfigSnapshot(List<Product> products, boolean individualProfile, int globalProfileSlot, int craftAmount,
+          AERecipeProfile.RouteFilterMode routeFilterMode, boolean editable) {
         this.products = Collections.unmodifiableList(new ArrayList<>(products));
         this.individualProfile = individualProfile;
         this.globalProfileSlot = Math.max(1, Math.min(10, globalProfileSlot));
         this.routeFilterMode = routeFilterMode == null ? AERecipeProfile.RouteFilterMode.BLACKLIST : routeFilterMode;
         this.craftAmount = AERecipeProfile.clampCraftAmount(craftAmount, getMaxCraftAmount());
+        this.editable = editable;
     }
 
     public List<Product> getProducts() {
@@ -88,6 +96,13 @@ public class AERecipeConfigSnapshot {
         return craftAmount;
     }
 
+    /**
+     * @return 当前查看者是否为机器所有者并可以修改此配置
+     */
+    public boolean isEditable() {
+        return editable;
+    }
+
     public int getMaxCraftAmount() {
         int maxCraftAmount = AERecipeProfile.MAX_CRAFT_AMOUNT;
         for (Product product : products) {
@@ -101,6 +116,7 @@ public class AERecipeConfigSnapshot {
         tag.setInteger(GLOBAL_PROFILE_SLOT, globalProfileSlot);
         tag.setString(ROUTE_FILTER_MODE, routeFilterMode.name());
         tag.setInteger(CRAFT_AMOUNT, craftAmount);
+        tag.setBoolean(EDITABLE, editable);
         NBTTagList productList = new NBTTagList();
         for (Product product : products) {
             NBTTagCompound productTag = new NBTTagCompound();
@@ -182,9 +198,10 @@ public class AERecipeConfigSnapshot {
         int globalProfileSlot = tag.hasKey(GLOBAL_PROFILE_SLOT, NBT.TAG_INT) ? tag.getInteger(GLOBAL_PROFILE_SLOT) : 1;
         AERecipeProfile.RouteFilterMode routeFilterMode = AERecipeProfile.RouteFilterMode.fromName(tag.getString(ROUTE_FILTER_MODE));
         int craftAmount = tag.hasKey(CRAFT_AMOUNT, NBT.TAG_INT) ? tag.getInteger(CRAFT_AMOUNT) : AERecipeProfile.DEFAULT_CRAFT_AMOUNT;
+        boolean editable = tag.getBoolean(EDITABLE);
         return products.isEmpty() && !individualProfile && globalProfileSlot == 1 && routeFilterMode == AERecipeProfile.RouteFilterMode.BLACKLIST &&
-               craftAmount == AERecipeProfile.DEFAULT_CRAFT_AMOUNT ? EMPTY :
-              new AERecipeConfigSnapshot(products, individualProfile, globalProfileSlot, craftAmount, routeFilterMode);
+               craftAmount == AERecipeProfile.DEFAULT_CRAFT_AMOUNT && !editable ? EMPTY :
+              new AERecipeConfigSnapshot(products, individualProfile, globalProfileSlot, craftAmount, routeFilterMode, editable);
     }
 
     private static NBTTagList writeStacks(List<ItemStack> stacks) {

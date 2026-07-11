@@ -71,7 +71,18 @@ public class AERecipeProfile {
     }
 
     public boolean toggleRouteFilterMode() {
-        routeFilterMode = routeFilterMode.next();
+        return setRouteFilterMode(routeFilterMode.next());
+    }
+
+    /**
+     * 将此配置固定到其所在目录对应的过滤模式。
+     */
+    public boolean setRouteFilterMode(RouteFilterMode filterMode) {
+        RouteFilterMode normalized = filterMode == null ? defaultRouteFilterMode : filterMode;
+        if (routeFilterMode == normalized) {
+            return false;
+        }
+        routeFilterMode = normalized;
         version++;
         return true;
     }

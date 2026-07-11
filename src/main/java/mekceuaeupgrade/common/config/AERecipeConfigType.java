@@ -8,7 +8,7 @@ import mekanism.common.inventory.container.SelectedWindowData.WindowType;
 
 public enum AERecipeConfigType {
     CRAFTING("crafting", AERecipeProfile.RouteFilterMode.BLACKLIST, true, true),
-    AUTO_PROCESSING("auto_processing", AERecipeProfile.RouteFilterMode.WHITELIST, false, false);
+    AUTO_PROCESSING("processing", AERecipeProfile.RouteFilterMode.WHITELIST, false, false);
 
     private final String id;
     private final AERecipeProfile.RouteFilterMode defaultFilterMode;

@@ -45,6 +45,13 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
                 sendSnapshot(host, player instanceof EntityPlayerMP playerMP ? playerMP : null, message.configType);
                 return;
             }
+            if (message.packetType == RecipeConfigPacket.SNAPSHOT) {
+                return;
+            }
+            if (message.packetType != RecipeConfigPacket.REQUEST && !AERecipeProfileManager.canEditConfiguration(tile, player)) {
+                sendSnapshot(host, player instanceof EntityPlayerMP playerMP ? playerMP : null, message.configType);
+                return;
+            }
             switch (message.packetType) {
                 case REQUEST -> {
                 }
@@ -67,7 +74,6 @@ public class PacketAERecipeConfig implements IMessageHandler<AERecipeConfigMessa
                 case TOGGLE_ROUTE_FILTER_MODE -> AERecipeProfileManager.toggleRouteFilterMode(host, player, message.configType);
                 case SET_ALL_ROUTES_ENABLED -> AERecipeProfileManager.setAllRoutesEnabled(host, player, message.direction > 0, message.configType);
                 case SNAPSHOT -> {
-                    return;
                 }
             }
             sendSnapshots(tile, host, player, message.configType);
