@@ -1,7 +1,6 @@
 {
   "parent": "mekanism:item/standard_item",
   "textures": {
-    "layer0": "mekanism:items/energyupgrade",
-    "layer1": "mekanism:items/logisticalsorter"
+    "layer0": "mekceuaeupgrade:items/aeoutputupgrade"
   }
 }

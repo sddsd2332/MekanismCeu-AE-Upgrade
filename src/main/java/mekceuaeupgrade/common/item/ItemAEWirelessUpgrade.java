@@ -82,7 +82,7 @@ public class ItemAEWirelessUpgrade extends ItemUpgrade implements INetworkEncoda
     @Override
     public ITextComponent getInstallFailureMessage(ItemStack stack, IUpgradeTile tile) {
         return canInstallUpgrade(stack, tile) ? null :
-              new TextComponentString(EnumColor.DARK_RED + LangUtils.localize("tooltip.mekceuaeupgrade.wireless_install_unlinked"));
+                new TextComponentString(EnumColor.DARK_RED + LangUtils.localize("tooltip.mekceuaeupgrade.wireless_install_unlinked"));
     }
 
     @Override
