@@ -68,7 +68,7 @@ dependencies {
     compileOnly "curse.maven:industrial-craft-242638:3838713"
 
 
-    modImplementation "libs:Mekanism-CE-Unofficial-All:10.0.0.450:dev"
+    modImplementation "libs:Mekanism-CE-Unofficial-All:10.0.1.455:dev"
     modImplementation "libs:MekanismCeU-MoreMachine:1.5.0:dev"
     modImplementation "libs:MekanismMixinHelp:1.1.5:dev"
     modImplementation "libs:AppliedEnergistics2-Supergiant:1.0.9:dev"
