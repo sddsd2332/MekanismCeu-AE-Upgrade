@@ -927,7 +927,8 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             super(gui, x, y, width, height, ROW_HEIGHT, GuiInnerScreen.SCREEN, GuiInnerScreen.SCREEN_SIZE);
         }
 
-        private void resetScroll() {
+        @Override
+        public void resetScroll() {
             scroll = 0;
         }
 
@@ -1087,7 +1088,8 @@ public class GuiAERecipeConfigWindow extends GuiWindow {
             super(gui, x, y, width, height, ROW_HEIGHT, GuiInnerScreen.SCREEN, GuiInnerScreen.SCREEN_SIZE);
         }
 
-        private void resetScroll() {
+        @Override
+        public void resetScroll() {
             scroll = 0;
         }
 

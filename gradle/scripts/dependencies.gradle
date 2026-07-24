@@ -79,7 +79,7 @@ dependencies {
     runtimeOnly 'curse.maven:better-advancements-272515:2685984'
     implementation 'curse.maven:crafttweaker-239197:4534504'
    
-    implementation rfg.deobf(files('libs/Mekanism-CE-Unofficial-All-10.0.0.450-dev.jar'))
+    implementation rfg.deobf(files('libs/Mekanism-CE-Unofficial-All-10.0.1.455-dev.jar'))
     implementation rfg.deobf(files('libs/MekanismCeU-MoreMachine-1.5.0-dev.jar'))
     implementation rfg.deobf(files("libs/MekanismMixinHelp-1.1.5-dev.jar"))
     implementation rfg.deobf('curse.maven:ae2-extended-life-570458:6302098')
