@@ -10,6 +10,8 @@ import mekanism.api.fluid.IExtendedFluidTank;
 import mekanism.api.gas.GasStack;
 import mekanism.api.gas.IExtendedGasTank;
 import mekanism.api.inventory.IInventorySlot;
+import mekanism.api.processing.MachinePort;
+import mekanism.api.processing.MachineResourceStack;
 import mekanism.common.inventory.slot.BasicInventorySlot;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
@@ -26,14 +28,16 @@ public abstract class AERecipePort {
 
     private final AERecipeStackKind kind;
     private final String portId;
+    private final MachinePort machinePort;
 
     /**
      * @param kind 端口接受或输出的栈类型
      * @param portId route 中用于匹配该端口的稳定 ID
      */
-    private AERecipePort(AERecipeStackKind kind, String portId) {
+    private AERecipePort(AERecipeStackKind kind, String portId, MachinePort machinePort) {
         this.kind = kind;
         this.portId = portId == null ? "" : portId;
+        this.machinePort = machinePort;
     }
 
     /**
@@ -48,6 +52,20 @@ public abstract class AERecipePort {
      */
     public String portId() {
         return portId;
+    }
+
+    public MachinePort toMachinePort() {
+        return machinePort;
+    }
+
+    protected final boolean canInsertMachine(@Nullable AERecipeRouteStack stack) {
+        MachineResourceStack converted = stack == null ? null : stack.toMachineResourceStack();
+        return converted != null && machinePort.canInsert(converted);
+    }
+
+    protected final boolean insertMachine(@Nullable AERecipeRouteStack stack) {
+        MachineResourceStack converted = stack == null ? null : stack.toMachineResourceStack();
+        return converted != null && machinePort.insert(converted);
     }
 
     /**
@@ -92,7 +110,7 @@ public abstract class AERecipePort {
      * @return 可恢复该端口状态的快照对象
      */
     public Snapshot snapshot() {
-        return new Snapshot(this, snapshotValue());
+        return new Snapshot(machinePort.snapshot());
     }
 
     /**
@@ -156,19 +174,17 @@ public abstract class AERecipePort {
      */
     public static final class Snapshot {
 
-        private final AERecipePort port;
-        private final Object value;
+        private final MachinePort.Snapshot snapshot;
 
-        private Snapshot(AERecipePort port, Object value) {
-            this.port = port;
-            this.value = value;
+        private Snapshot(MachinePort.Snapshot snapshot) {
+            this.snapshot = snapshot;
         }
 
         /**
          * 将端口恢复到创建快照时的状态。
          */
         public void restore() {
-            port.restoreValue(value);
+            snapshot.restore();
         }
     }
 
@@ -184,18 +200,18 @@ public abstract class AERecipePort {
          * @param slot Mekanism 物品槽位
          */
         private ItemPort(String portId, IInventorySlot slot) {
-            super(AERecipeStackKind.ITEM, portId);
+            super(AERecipeStackKind.ITEM, portId, MachinePort.item(portId, MachinePort.Role.BOTH, slot));
             this.slot = slot;
         }
 
         @Override
         public boolean canInsert(AERecipeRouteStack stack) {
-            return insert(stack, Action.SIMULATE);
+            return canInsertMachine(stack);
         }
 
         @Override
         public boolean insert(AERecipeRouteStack stack) {
-            return insert(stack, Action.EXECUTE);
+            return insertMachine(stack);
         }
 
         /**
@@ -243,18 +259,18 @@ public abstract class AERecipePort {
          * @param tank Mekanism 气体储罐
          */
         private GasPort(String portId, IExtendedGasTank tank) {
-            super(AERecipeStackKind.GAS, portId);
+            super(AERecipeStackKind.GAS, portId, MachinePort.gas(portId, MachinePort.Role.BOTH, tank));
             this.tank = tank;
         }
 
         @Override
         public boolean canInsert(AERecipeRouteStack stack) {
-            return insert(stack, Action.SIMULATE);
+            return canInsertMachine(stack);
         }
 
         @Override
         public boolean insert(AERecipeRouteStack stack) {
-            return insert(stack, Action.EXECUTE);
+            return insertMachine(stack);
         }
 
         /**
@@ -299,18 +315,18 @@ public abstract class AERecipePort {
          * @param tank Mekanism 流体储罐
          */
         private FluidPort(String portId, IExtendedFluidTank tank) {
-            super(AERecipeStackKind.FLUID, portId);
+            super(AERecipeStackKind.FLUID, portId, MachinePort.fluid(portId, MachinePort.Role.BOTH, tank));
             this.tank = tank;
         }
 
         @Override
         public boolean canInsert(AERecipeRouteStack stack) {
-            return insert(stack, Action.SIMULATE);
+            return canInsertMachine(stack);
         }
 
         @Override
         public boolean insert(AERecipeRouteStack stack) {
-            return insert(stack, Action.EXECUTE);
+            return insertMachine(stack);
         }
 
         /**

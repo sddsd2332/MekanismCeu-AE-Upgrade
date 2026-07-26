@@ -2,11 +2,15 @@ package mekceuaeupgrade.common.item;
 
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
+import mekceuaeupgrade.common.host.IAEItemRecipeHost;
+import mekceuaeupgrade.common.host.IAEOutputHost;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.AEUpgradeRecipeCache;
 
 import mekanism.api.EnumColor;
 import mekanism.common.Upgrade;
+import mekanism.common.recipe.cache.IRecipeLookupHandler;
+import mekanism.common.upgrade.ExternalUpgradeSupportRegistry;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import net.minecraft.item.ItemStack;
 
@@ -93,6 +97,19 @@ public final class AEUpgrade {
           .register();
 
     private AEUpgrade() {
+    }
+
+    public static void registerExternalSupport() {
+        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("crafting_upgrade_support"),
+              tile -> tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost,
+              AE_CRAFTING, AE_WIRELESS_CRAFTING);
+        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("auto_processing_upgrade_support"),
+              tile -> tile instanceof IAEItemRecipeHost,
+              AE_AUTO_PROCESSING, AE_WIRELESS_AUTO_PROCESSING);
+        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("output_upgrade_support"),
+              tile -> !(tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost) &&
+                      !(tile instanceof IAEItemRecipeHost) && tile instanceof IAEOutputHost,
+              AE_OUTPUT, AE_WIRELESS_OUTPUT);
     }
 
     private static void handleAEUpgradeChanged(IAEUpgradeHost host, Upgrade upgrade, int previousAmount, int amount) {

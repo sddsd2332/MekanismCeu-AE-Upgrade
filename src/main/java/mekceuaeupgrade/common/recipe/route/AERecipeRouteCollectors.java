@@ -1,34 +1,16 @@
 package mekceuaeupgrade.common.recipe.route;
 
-import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
-import mekceuaeupgrade.common.recipe.AERecipeItemInputs;
-import mekceuaeupgrade.common.recipe.AERecipeStacks;
-
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
+import mekanism.api.processing.MachineRecipeRoute;
 import mekanism.common.recipe.GasConversionHandler;
 import mekanism.common.recipe.RecipeHandler;
-import mekanism.common.recipe.inputs.AdvancedMachineInput;
-import mekanism.common.recipe.inputs.ChemicalGasInput;
-import mekanism.common.recipe.inputs.ChemicalPairInput;
-import mekanism.common.recipe.inputs.FluidInput;
-import mekanism.common.recipe.inputs.GasAndFluidInput;
-import mekanism.common.recipe.inputs.GasInput;
-import mekanism.common.recipe.inputs.ItemStackInput;
-import mekanism.common.recipe.inputs.MachineInput;
-import mekanism.common.recipe.inputs.NucleosynthesizerInput;
-import mekanism.common.recipe.inputs.PressurizedInput;
-import mekanism.common.recipe.inputs.RotaryInput;
-import mekanism.common.recipe.machines.AdvancedMachineRecipe;
-import mekanism.common.recipe.machines.CrystallizerRecipe;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
-import mekanism.common.recipe.machines.MachineRecipe;
-import mekanism.common.recipe.machines.RotaryRecipe;
-import mekanism.common.recipe.outputs.ChemicalPairOutput;
-import mekanism.common.recipe.outputs.FluidOutput;
-import mekanism.common.recipe.outputs.GasOutput;
-import mekanism.common.recipe.outputs.ItemStackOutput;
-import mekanism.common.recipe.outputs.PressurizedOutput;
+import mekanism.common.recipe.inputs.*;
+import mekanism.common.recipe.machines.*;
+import mekanism.common.recipe.outputs.*;
+import mekanism.common.recipe.processing.MachineRecipeRouteCollectors;
+import mekceuaeupgrade.common.recipe.AERecipeItemInputs;
+import mekceuaeupgrade.common.recipe.AERecipeStacks;
 import net.minecraft.item.ItemStack;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -38,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 /**
  * 从 Mekanism 配方表收集可暴露给 AE 的通用 route。
@@ -61,21 +44,7 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectItemToGas(
           Map<ItemStackInput, ? extends MachineRecipe<ItemStackInput, GasOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (MachineRecipe<ItemStackInput, GasOutput, ?> recipe : recipes.values()) {
-            ItemStack input = recipe.getInput().ingredient;
-            GasStack output = recipe.getOutput().output;
-            if (!isPositiveGas(output)) {
-                continue;
-            }
-            for (ItemStack expandedInput : AERecipeItemInputs.expand(input, candidate -> itemToGasRecipeMatches(recipes, candidate, output))) {
-                routes.add(AERecipeRoute.builder("route:item_to_gas")
-                      .inputItem("item_input", expandedInput)
-                      .outputGas("gas_output", output)
-                      .build());
-            }
-        }
-        return routes;
+        return fromCore(MachineRecipeRouteCollectors.collectItemToGas(recipes), UnaryOperator.identity());
     }
 
     /**
@@ -85,17 +54,13 @@ public final class AERecipeRouteCollectors {
      * @return 可暴露给 AE 的 route 列表
      */
     public static List<AERecipeRoute> collectGasToItem(Map<GasInput, ? extends CrystallizerRecipe> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectGasToItem(recipes), id -> id + ".fake");
         for (CrystallizerRecipe recipe : recipes.values()) {
             GasStack requiredGas = recipe.getInput().ingredient;
             ItemStack output = recipe.getOutput().output;
             if (!isPositiveGas(requiredGas) || !isExposableOutput(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_to_item.fake")
-                  .inputGas("gas_input", requiredGas)
-                  .outputItem("item_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(requiredGas.getGas())) {
                 addGasConversionToItemRoute(routes, "route:gas_to_item.conversion", requiredGas, source, output);
             }
@@ -111,17 +76,13 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectGasToGas(
           Map<GasInput, ? extends MachineRecipe<GasInput, GasOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectGasToGas(recipes), id -> id + ".fake");
         for (MachineRecipe<GasInput, GasOutput, ?> recipe : recipes.values()) {
             GasStack requiredGas = recipe.getInput().ingredient;
             GasStack output = recipe.getOutput().output;
             if (!isPositiveGas(requiredGas) || !isPositiveGas(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_to_gas.fake")
-                  .inputGas("gas_input", requiredGas)
-                  .outputGas("gas_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(requiredGas.getGas())) {
                 addGasOnlyConversionToGasRoute(routes, requiredGas, source, output);
             }
@@ -142,7 +103,8 @@ public final class AERecipeRouteCollectors {
         if (gasType == null || gasPerOperation <= 0) {
             return Collections.emptyList();
         }
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectItemGasToGas(recipes, gasType, gasPerOperation),
+              id -> id + ".fake");
         GasStack requiredGas = new GasStack(gasType, gasPerOperation);
         for (MachineRecipe<ItemStackInput, GasOutput, ?> recipe : recipes.values()) {
             ItemStack itemInput = recipe.getInput().ingredient;
@@ -151,11 +113,6 @@ public final class AERecipeRouteCollectors {
                 continue;
             }
             for (ItemStack expandedInput : AERecipeItemInputs.expand(itemInput, candidate -> itemToGasRecipeMatches(recipes, candidate, output))) {
-                routes.add(AERecipeRoute.builder("route:item_gas_to_gas.fake")
-                      .inputItem("item_input", expandedInput)
-                      .inputGas("gas_input", requiredGas)
-                      .outputGas("gas_output", output)
-                      .build());
                 for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(gasType)) {
                     addItemGasConversionToGasRoute(routes, expandedInput, requiredGas, source, output);
                 }
@@ -176,11 +133,12 @@ public final class AERecipeRouteCollectors {
         if (gasPerOperation <= 0) {
             return Collections.emptyList();
         }
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectAdvancedGasToItem(recipes, gasPerOperation),
+              id -> id + ".fake");
         for (AdvancedMachineRecipe<?> recipe : recipes.values()) {
             AdvancedMachineInput input = recipe.getInput();
             ItemStack output = recipe.getOutput().output;
-            addItemGasToItemRoutes(routes, input.itemStack, input.gasType, gasPerOperation, output,
+            addItemGasConversionToItemRoutes(routes, input.itemStack, input.gasType, gasPerOperation, output,
                   candidate -> advancedGasToItemRecipeMatches(recipes, candidate, input.gasType, output));
         }
         return routes;
@@ -198,11 +156,12 @@ public final class AERecipeRouteCollectors {
         if (gasPerOperation <= 0) {
             return Collections.emptyList();
         }
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectFarmGasToItem(recipes, gasPerOperation),
+              id -> id + ".fake");
         for (FarmMachineRecipe<?> recipe : recipes.values()) {
             AdvancedMachineInput input = recipe.getInput();
             ItemStack output = recipe.getOutput().getMainOutput();
-            addItemGasToItemRoutes(routes, input.itemStack, input.gasType, gasPerOperation, output,
+            addItemGasConversionToItemRoutes(routes, input.itemStack, input.gasType, gasPerOperation, output,
                   candidate -> farmGasToItemRecipeMatches(recipes, candidate, input.gasType, output));
         }
         return routes;
@@ -216,7 +175,8 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectNucleosynthesizerGasToItem(
           Map<NucleosynthesizerInput, ? extends MachineRecipe<NucleosynthesizerInput, ItemStackOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectNucleosynthesizerGasToItem(recipes),
+              id -> id + ".fake");
         for (MachineRecipe<NucleosynthesizerInput, ItemStackOutput, ?> recipe : recipes.values()) {
             NucleosynthesizerInput input = recipe.getInput();
             GasStack requiredGas = input.getGas();
@@ -227,17 +187,33 @@ public final class AERecipeRouteCollectors {
             }
             for (ItemStack expandedSolid : AERecipeItemInputs.expand(solidInput,
                   candidate -> nucleosynthesizerRecipeMatches(recipes, candidate, requiredGas, output))) {
-                routes.add(AERecipeRoute.builder("route:item_gas_to_item.fake")
-                      .inputItem("item_input", expandedSolid)
-                      .inputGas("gas_input", requiredGas)
-                      .outputItem("item_output", output)
-                      .build());
                 for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(requiredGas.getGas())) {
                     addItemGasConversionToItemRoute(routes, expandedSolid, requiredGas, source, output);
                 }
             }
         }
         return routes;
+    }
+
+    public static List<AERecipeRoute> collectReplicatorItemTemplate(
+          Map<NucleosynthesizerInput, ? extends MachineRecipe<NucleosynthesizerInput, ItemStackOutput, ?>> recipes,
+          @Nullable ItemStack template, String uuPortId) {
+        return fromCore(MachineRecipeRouteCollectors.collectReplicatorItemTemplate(recipes, template, uuPortId),
+              UnaryOperator.identity());
+    }
+
+    public static List<AERecipeRoute> collectReplicatorGasTemplate(
+          Map<ChemicalGasInput, ? extends MachineRecipe<ChemicalGasInput, GasOutput, ?>> recipes,
+          @Nullable GasStack template, String uuPortId) {
+        return fromCore(MachineRecipeRouteCollectors.collectReplicatorGasTemplate(recipes, template, uuPortId),
+              UnaryOperator.identity());
+    }
+
+    public static List<AERecipeRoute> collectReplicatorFluidTemplate(
+          Map<GasAndFluidInput, ? extends MachineRecipe<GasAndFluidInput, FluidOutput, ?>> recipes,
+          @Nullable FluidStack template, String uuPortId) {
+        return fromCore(MachineRecipeRouteCollectors.collectReplicatorFluidTemplate(recipes, template, uuPortId),
+              UnaryOperator.identity());
     }
 
     /**
@@ -248,18 +224,13 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectChemicalGasToGas(
           Map<ChemicalGasInput, ? extends MachineRecipe<ChemicalGasInput, GasOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectChemicalGasToGas(recipes), id -> id + ".fake");
         for (MachineRecipe<ChemicalGasInput, GasOutput, ?> recipe : recipes.values()) {
             ChemicalGasInput input = recipe.getInput();
             GasStack output = recipe.getOutput().output;
             if (!isPositiveGas(input.input) || !isPositiveGas(input.uu) || !isPositiveGas(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_gas_to_gas.fake")
-                  .inputGas("left_gas", input.input)
-                  .inputGas("right_gas", input.uu)
-                  .outputGas("gas_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource leftSource : GasConversionHandler.getConversionSourcesForGas(getGas(input.input))) {
                 for (GasConversionHandler.GasConversionSource rightSource : GasConversionHandler.getConversionSourcesForGas(getGas(input.uu))) {
                     addGasPairConversionToGasRoute(routes, input.input, leftSource, input.uu, rightSource, output);
@@ -277,18 +248,14 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectChemicalPairToGas(
           Map<ChemicalPairInput, ? extends MachineRecipe<ChemicalPairInput, GasOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectChemicalPairToGas(recipes),
+              ignored -> "route:gas_pair_to_gas.fake");
         for (MachineRecipe<ChemicalPairInput, GasOutput, ?> recipe : recipes.values()) {
             ChemicalPairInput input = recipe.getInput();
             GasStack output = recipe.getOutput().output;
             if (!isPositiveGas(input.leftGas) || !isPositiveGas(input.rightGas) || !isPositiveGas(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_pair_to_gas.fake")
-                  .inputGas("left_gas", input.leftGas)
-                  .inputGas("right_gas", input.rightGas)
-                  .outputGas("gas_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource leftSource : GasConversionHandler.getConversionSourcesForGas(input.leftGas.getGas())) {
                 for (GasConversionHandler.GasConversionSource rightSource : GasConversionHandler.getConversionSourcesForGas(input.rightGas.getGas())) {
                     addGasPairConversionToGasRoute(routes, input.leftGas, leftSource, input.rightGas, rightSource, output);
@@ -306,18 +273,13 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectGasFluidToGas(
           Map<GasAndFluidInput, ? extends MachineRecipe<GasAndFluidInput, GasOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectGasFluidToGas(recipes), id -> id + ".fake");
         for (MachineRecipe<GasAndFluidInput, GasOutput, ?> recipe : recipes.values()) {
             GasAndFluidInput input = recipe.getInput();
             GasStack output = recipe.getOutput().output;
             if (!isPositiveGas(input.ingredientGas) || !isPositiveFluid(input.ingredientFluid) || !isPositiveGas(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_fluid_to_gas.fake")
-                  .inputGas("gas_input", input.ingredientGas)
-                  .inputFluid("fluid_input", input.ingredientFluid)
-                  .outputGas("gas_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(getGas(input.ingredientGas))) {
                 addGasConversionFluidToGasRoute(routes, input.ingredientGas, source, input.ingredientFluid, output);
             }
@@ -333,21 +295,7 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectFluidToGasPair(
           Map<FluidInput, ? extends MachineRecipe<FluidInput, ChemicalPairOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (MachineRecipe<FluidInput, ChemicalPairOutput, ?> recipe : recipes.values()) {
-            FluidStack input = recipe.getInput().ingredient;
-            ChemicalPairOutput output = recipe.getOutput();
-            if (!isPositiveFluid(input) || output == null || !output.isValid() ||
-                !isPositiveGas(output.leftGas) || !isPositiveGas(output.rightGas)) {
-                continue;
-            }
-            routes.add(AERecipeRoute.builder("route:fluid_to_gas_pair")
-                  .inputFluid("fluid_input", input)
-                  .outputGas("left_gas_output", output.leftGas)
-                  .outputGas("right_gas_output", output.rightGas)
-                  .build());
-        }
-        return routes;
+        return fromCore(MachineRecipeRouteCollectors.collectFluidToGasPair(recipes), UnaryOperator.identity());
     }
 
     /**
@@ -358,7 +306,7 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectPressurized(
           Map<PressurizedInput, ? extends MachineRecipe<PressurizedInput, PressurizedOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectPressurized(recipes), id -> id + ".fake");
         for (MachineRecipe<PressurizedInput, PressurizedOutput, ?> recipe : recipes.values()) {
             PressurizedInput input = recipe.getInput();
             PressurizedOutput output = recipe.getOutput();
@@ -368,7 +316,6 @@ public final class AERecipeRouteCollectors {
             }
             for (ItemStack expandedSolid : AERecipeItemInputs.expand(input.getSolid(),
                   candidate -> pressurizedRecipeMatches(recipes, candidate, input.getFluid(), input.getGas(), output))) {
-                addPressurizedRoute(routes, "route:pressurized.fake", expandedSolid, input.getFluid(), input.getGas(), ItemStack.EMPTY, output);
                 for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(getGas(input.getGas()))) {
                     addPressurizedGasConversionRoute(routes, input, expandedSolid, source, output);
                 }
@@ -384,7 +331,7 @@ public final class AERecipeRouteCollectors {
      * @return 可暴露给 AE 的 route 列表
      */
     public static List<AERecipeRoute> collectRotaryGasToFluid(Map<RotaryInput, ? extends RotaryRecipe> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectRotaryGasToFluid(recipes), UnaryOperator.identity());
         for (RotaryRecipe recipe : recipes.values()) {
             if (!recipe.hasGasToFluid()) {
                 continue;
@@ -392,10 +339,6 @@ public final class AERecipeRouteCollectors {
             GasStack input = recipe.getGasInput();
             FluidStack output = recipe.getFluidOutput(input);
             if (isPositiveGas(input) && isPositiveFluid(output)) {
-                routes.add(AERecipeRoute.builder("route:gas_to_fluid")
-                      .inputGas("gas_input", input)
-                      .outputFluid("fluid_output", output)
-                      .build());
                 for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(getGas(input))) {
                     addGasConversionToFluidRoute(routes, input, source, output);
                 }
@@ -411,21 +354,7 @@ public final class AERecipeRouteCollectors {
      * @return 可暴露给 AE 的 route 列表
      */
     public static List<AERecipeRoute> collectRotaryFluidToGas(Map<RotaryInput, ? extends RotaryRecipe> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (RotaryRecipe recipe : recipes.values()) {
-            if (!recipe.hasFluidToGas()) {
-                continue;
-            }
-            FluidStack input = recipe.getFluidInput();
-            GasStack output = recipe.getGasOutput(input);
-            if (isPositiveFluid(input) && isPositiveGas(output)) {
-                routes.add(AERecipeRoute.builder("route:fluid_to_gas")
-                      .inputFluid("fluid_input", input)
-                      .outputGas("gas_output", output)
-                      .build());
-            }
-        }
-        return routes;
+        return fromCore(MachineRecipeRouteCollectors.collectRotaryFluidToGas(recipes), UnaryOperator.identity());
     }
 
     /**
@@ -436,18 +365,13 @@ public final class AERecipeRouteCollectors {
      */
     public static List<AERecipeRoute> collectGasFluidToFluid(
           Map<GasAndFluidInput, ? extends MachineRecipe<GasAndFluidInput, FluidOutput, ?>> recipes) {
-        List<AERecipeRoute> routes = new ArrayList<>();
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectGasFluidToFluid(recipes), id -> id + ".fake");
         for (MachineRecipe<GasAndFluidInput, FluidOutput, ?> recipe : recipes.values()) {
             GasAndFluidInput input = recipe.getInput();
             FluidStack output = recipe.getOutput().output;
             if (!isPositiveGas(input.ingredientGas) || !isPositiveFluid(input.ingredientFluid) || !isPositiveFluid(output)) {
                 continue;
             }
-            routes.add(AERecipeRoute.builder("route:gas_fluid_to_fluid.fake")
-                  .inputGas("gas_input", input.ingredientGas)
-                  .inputFluid("fluid_input", input.ingredientFluid)
-                  .outputFluid("fluid_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(getGas(input.ingredientGas))) {
                 addGasConversionFluidToFluidRoute(routes, input.ingredientGas, source, input.ingredientFluid, output);
             }
@@ -455,22 +379,31 @@ public final class AERecipeRouteCollectors {
         return routes;
     }
 
-    private static void addItemGasToItemRoutes(List<AERecipeRoute> routes, ItemStack itemInput, @Nullable Gas gasType, int gasPerOperation,
+    private static void addItemGasConversionToItemRoutes(List<AERecipeRoute> routes, ItemStack itemInput, @Nullable Gas gasType, int gasPerOperation,
           ItemStack output, Predicate<ItemStack> acceptsItemInput) {
         GasStack requiredGas = gasType == null || gasPerOperation <= 0 ? null : new GasStack(gasType, gasPerOperation);
         if (!isPositiveGas(requiredGas) || !isExposableOutput(output)) {
             return;
         }
         for (ItemStack expandedInput : AERecipeItemInputs.expand(itemInput, acceptsItemInput)) {
-            routes.add(AERecipeRoute.builder("route:item_gas_to_item.fake")
-                  .inputItem("item_input", expandedInput)
-                  .inputGas("gas_input", requiredGas)
-                  .outputItem("item_output", output)
-                  .build());
             for (GasConversionHandler.GasConversionSource source : GasConversionHandler.getConversionSourcesForGas(gasType)) {
                 addItemGasConversionToItemRoute(routes, expandedInput, requiredGas, source, output);
             }
         }
+    }
+
+    private static List<AERecipeRoute> fromCore(List<MachineRecipeRoute> coreRoutes, UnaryOperator<String> routeIdMapper) {
+        if (coreRoutes == null || coreRoutes.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<AERecipeRoute> routes = new ArrayList<>(coreRoutes.size());
+        for (MachineRecipeRoute coreRoute : coreRoutes) {
+            AERecipeRoute converted = AERecipeRoute.fromMachineRecipeRoute(coreRoute);
+            if (converted != null) {
+                routes.add(new AERecipeRoute(routeIdMapper.apply(converted.routeId()), converted.inputs(), converted.outputs()));
+            }
+        }
+        return routes;
     }
 
     private static void addGasConversionToItemRoute(List<AERecipeRoute> routes, String routeId, GasStack requiredGas,
@@ -669,11 +602,6 @@ public final class AERecipeRouteCollectors {
         if (!solid.isEmpty() && fluid != null && gas != null && !carrier.isEmpty()) {
             addPressurizedRoute(routes, "route:pressurized.conversion", solid, fluid, gas, carrier, output, operations);
         }
-    }
-
-    private static void addPressurizedRoute(List<AERecipeRoute> routes, String routeId, ItemStack solidInput, FluidStack fluidInput,
-          GasStack gasInput, ItemStack gasLegacyInput, PressurizedOutput output) {
-        addPressurizedRoute(routes, routeId, solidInput, fluidInput, gasInput, gasLegacyInput, output, 1);
     }
 
     private static void addPressurizedRoute(List<AERecipeRoute> routes, String routeId, ItemStack solidInput, FluidStack fluidInput,

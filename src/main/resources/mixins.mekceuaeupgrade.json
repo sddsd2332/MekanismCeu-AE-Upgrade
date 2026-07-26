@@ -9,7 +9,6 @@
     "ae2.MixinCraftingSupplierLocator",
     "ae2.MixinNetworkCraftingProvidersPatternsForKey",
     "mekanism.MixinItemConfigurationCard",
-    "mekanism.MixinTileComponentUpgrade",
     "mekanism.MixinTileEntityAmbientAccumulatorEnergy",
     "mekanism.MixinTileEntityAdvancedElectricMachine",
     "mekanism.MixinTileEntityAntiprotonicNucleosynthesizer",

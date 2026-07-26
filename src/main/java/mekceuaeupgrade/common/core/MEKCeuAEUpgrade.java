@@ -78,6 +78,7 @@ public class MEKCeuAEUpgrade implements IModule {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        AEUpgrade.registerExternalSupport();
         Mekanism.modulesLoaded.add(this);
         AEUpgradeWindowTypes.init();
         packetHandler.initialize();
