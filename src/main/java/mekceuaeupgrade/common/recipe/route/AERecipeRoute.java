@@ -2,6 +2,8 @@ package mekceuaeupgrade.common.recipe.route;
 
 import com.github.bsideup.jabel.Desugar;
 import mekanism.api.gas.GasStack;
+import mekanism.api.processing.MachineRecipeRoute;
+import mekanism.api.processing.MachineResourceStack;
 import mekceuaeupgrade.common.config.AEItemStackKey;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import net.minecraft.item.ItemStack;
@@ -43,6 +45,53 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
      */
     public static Builder builder(String routeId) {
         return new Builder(routeId);
+    }
+
+    @Nullable
+    public MachineRecipeRoute toMachineRecipeRoute() {
+        try {
+            MachineRecipeRoute.Builder builder = MachineRecipeRoute.builder(routeId);
+            for (AERecipeRouteStack input : inputs) {
+                MachineResourceStack converted = input.toMachineResourceStack();
+                if (converted == null) {
+                    return null;
+                }
+                builder.input(converted);
+            }
+            for (AERecipeRouteStack output : outputs) {
+                MachineResourceStack converted = output.toMachineResourceStack();
+                if (converted == null) {
+                    return null;
+                }
+                builder.output(converted);
+            }
+            return builder.build();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public static AERecipeRoute fromMachineRecipeRoute(@Nullable MachineRecipeRoute route) {
+        if (route == null) {
+            return null;
+        }
+        Builder builder = builder(route.routeId());
+        for (MachineResourceStack input : route.inputs()) {
+            AERecipeRouteStack converted = AERecipeRouteStack.fromMachineResourceStack(input);
+            if (converted == null) {
+                return null;
+            }
+            builder.inputs.add(converted);
+        }
+        for (MachineResourceStack output : route.guaranteedOutputs()) {
+            AERecipeRouteStack converted = AERecipeRouteStack.fromMachineResourceStack(output);
+            if (converted == null) {
+                return null;
+            }
+            builder.outputs.add(converted);
+        }
+        return builder.build();
     }
 
     /**

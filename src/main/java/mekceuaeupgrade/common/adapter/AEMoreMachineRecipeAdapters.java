@@ -911,74 +911,29 @@ public final class AEMoreMachineRecipeAdapters {
 
     private static <RECIPE extends MachineRecipe<NucleosynthesizerInput, ItemStackOutput, RECIPE>> List<AEExposedRecipe> collectReplicatorItemTemplateRecipes(
           Map<NucleosynthesizerInput, RECIPE> recipes, @Nullable IInventorySlot templateSlot, Predicate<Gas> isValidGas) {
-        if (templateSlot == null || !AEUpgradeFakeGas.isAvailable()) {
+        if (templateSlot == null) {
             return Collections.emptyList();
         }
-        ItemStack template = templateSlot.getStack();
-        if (template.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (RECIPE recipe : recipes.values()) {
-            NucleosynthesizerInput input = recipe.getInput();
-            GasStack uu = input == null ? null : input.getGas();
-            ItemStack requiredTemplate = input == null ? ItemStack.EMPTY : input.getSolid();
-            ItemStack output = recipe.getOutput().output;
-            if (MachineInput.inputContains(template, requiredTemplate) && isPositiveGas(uu) && isValidGas.test(uu.getGas()) &&
-                isPositiveItem(output)) {
-                routes.add(AERecipeRoute.builder("route:replicator_item.template")
-                      .inputGas("uu_input", uu)
-                      .outputItem("item_output", output)
-                      .build());
-            }
-        }
-        return AERecipeRoute.toLegacyRecipes(routes);
+        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectReplicatorItemTemplate(
+              recipes, templateSlot.getStack(), "uu_input"));
     }
 
     private static <RECIPE extends MachineRecipe<ChemicalGasInput, GasOutput, RECIPE>> List<AEExposedRecipe> collectReplicatorGasTemplateRecipes(
           Map<ChemicalGasInput, RECIPE> recipes, @Nullable IExtendedGasTank templateTank) {
-        if (templateTank == null || !AEUpgradeFakeGas.isAvailable()) {
+        if (templateTank == null) {
             return Collections.emptyList();
         }
-        GasStack template = templateTank.getGas();
-        if (!isPositiveGas(template)) {
-            return Collections.emptyList();
-        }
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (RECIPE recipe : recipes.values()) {
-            ChemicalGasInput input = recipe.getInput();
-            GasStack output = recipe.getOutput().output;
-            if (input != null && hasGas(template, input.input) && isPositiveGas(input.uu) && isPositiveGas(output)) {
-                routes.add(AERecipeRoute.builder("route:replicator_gas.template")
-                      .inputGas("uu_input", input.uu)
-                      .outputGas("gas_output", output)
-                      .build());
-            }
-        }
-        return AERecipeRoute.toLegacyRecipes(routes);
+        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectReplicatorGasTemplate(
+              recipes, templateTank.getGas(), "uu_input"));
     }
 
     private static <RECIPE extends MachineRecipe<GasAndFluidInput, FluidOutput, RECIPE>> List<AEExposedRecipe> collectReplicatorFluidTemplateRecipes(
           Map<GasAndFluidInput, RECIPE> recipes, @Nullable IExtendedFluidTank templateTank) {
-        if (templateTank == null || !AEUpgradeFakeGas.isAvailable() || !AEUpgradeFakeFluid.isAvailable()) {
+        if (templateTank == null) {
             return Collections.emptyList();
         }
-        FluidStack template = templateTank.getFluid();
-        if (!isPositiveFluid(template)) {
-            return Collections.emptyList();
-        }
-        List<AERecipeRoute> routes = new ArrayList<>();
-        for (RECIPE recipe : recipes.values()) {
-            GasAndFluidInput input = recipe.getInput();
-            FluidStack output = recipe.getOutput().output;
-            if (input != null && hasFluid(template, input.ingredientFluid) && isPositiveGas(input.ingredientGas) && isPositiveFluid(output)) {
-                routes.add(AERecipeRoute.builder("route:replicator_fluid.template")
-                      .inputGas("uu_input", input.ingredientGas)
-                      .outputFluid("fluid_output", output)
-                      .build());
-            }
-        }
-        return AERecipeRoute.toLegacyRecipes(routes);
+        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectReplicatorFluidTemplate(
+              recipes, templateTank.getFluid(), "uu_input"));
     }
 
     @Nullable

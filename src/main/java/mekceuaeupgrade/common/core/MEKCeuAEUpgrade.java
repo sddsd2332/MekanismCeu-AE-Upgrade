@@ -5,6 +5,7 @@ import mekanism.common.Mekanism;
 import mekanism.common.Version;
 import mekanism.common.base.IModule;
 import mekanism.common.config.MekanismConfig;
+import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.network.MEKCeuAEUpgradePacketHandler;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
@@ -75,6 +76,7 @@ public class MEKCeuAEUpgrade implements IModule {
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        AEUpgrade.registerExternalSupport();
         Mekanism.modulesLoaded.add(this);
         AEUpgradeWindowTypes.init();
         packetHandler.initialize();

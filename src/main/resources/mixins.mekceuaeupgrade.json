@@ -6,7 +6,6 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "mekanism.MixinItemConfigurationCard",
-    "mekanism.MixinTileComponentUpgrade",
     "mekanism.MixinTileEntityAmbientAccumulatorEnergy",
     "mekanism.MixinTileEntityAdvancedElectricMachine",
     "mekanism.MixinTileEntityAntiprotonicNucleosynthesizer",

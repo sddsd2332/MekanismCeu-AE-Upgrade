@@ -1,6 +1,8 @@
 package mekceuaeupgrade.common.transfer;
 
 import mekanism.api.gas.GasStack;
+import mekanism.api.processing.MachineResourceStack;
+import mekanism.api.processing.MachineTransferPlan;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
 import mekceuaeupgrade.common.recipe.route.AERecipeRouteLegacyIO;
@@ -137,15 +139,8 @@ public final class AERecipeTransferPlan {
      * @return 所有端口都能完整接收对应栈时返回 true
      */
     public boolean canExecute() {
-        if (entries.isEmpty()) {
-            return false;
-        }
-        for (Entry entry : entries) {
-            if (entry.port == null || entry.stack == null || entry.port.kind() != entry.stack.kind() || !entry.port.canInsert(entry.stack)) {
-                return false;
-            }
-        }
-        return true;
+        MachineTransferPlan plan = createMachinePlan();
+        return plan != null && plan.canExecute();
     }
 
     /**
@@ -154,17 +149,27 @@ public final class AERecipeTransferPlan {
      * @return 所有输入真实写入成功时返回 true，失败会恢复已写入端口
      */
     public boolean execute() {
-        if (!canExecute()) {
-            return false;
+        MachineTransferPlan plan = createMachinePlan();
+        return plan != null && plan.execute();
+    }
+
+    @Nullable
+    private MachineTransferPlan createMachinePlan() {
+        if (entries.isEmpty()) {
+            return null;
         }
-        List<AERecipePort.Snapshot> snapshots = snapshotPorts();
+        MachineTransferPlan plan = MachineTransferPlan.create();
         for (Entry entry : entries) {
-            if (!entry.port.insert(entry.stack)) {
-                restore(snapshots);
-                return false;
+            if (entry.port == null || entry.stack == null || entry.port.kind() != entry.stack.kind()) {
+                return null;
             }
+            MachineResourceStack converted = entry.stack.toMachineResourceStack();
+            if (converted == null) {
+                return null;
+            }
+            plan.addInsert(entry.port.toMachinePort(), converted);
         }
-        return true;
+        return plan;
     }
 
     /**

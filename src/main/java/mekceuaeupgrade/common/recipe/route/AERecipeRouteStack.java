@@ -2,6 +2,7 @@ package mekceuaeupgrade.common.recipe.route;
 
 import com.github.bsideup.jabel.Desugar;
 import mekanism.api.gas.GasStack;
+import mekanism.api.processing.MachineResourceStack;
 import mekceuaeupgrade.common.recipe.AERecipeStacks;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeFluid;
 import mekceuaeupgrade.common.transfer.AEUpgradeFakeGas;
@@ -97,6 +98,33 @@ public record AERecipeRouteStack(
      */
     public AERecipeRouteStack withOrder(int order) {
         return new AERecipeRouteStack(kind, portId, order, itemStack, gasStack, fluidStack, legacyItemStack);
+    }
+
+    @Nullable
+    public MachineResourceStack toMachineResourceStack() {
+        try {
+            MachineResourceStack stack = switch (kind) {
+                case ITEM -> MachineResourceStack.item(portId, itemStack);
+                case GAS -> MachineResourceStack.gas(portId, gasStack);
+                case FLUID -> MachineResourceStack.fluid(portId, fluidStack);
+            };
+            return stack.withOrder(order);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public static AERecipeRouteStack fromMachineResourceStack(@Nullable MachineResourceStack stack) {
+        if (stack == null) {
+            return null;
+        }
+        AERecipeRouteStack converted = switch (stack.kind()) {
+            case ITEM -> item(stack.portId(), stack.itemStack());
+            case GAS -> gas(stack.portId(), stack.gasStack());
+            case FLUID -> fluid(stack.portId(), stack.fluidStack());
+        };
+        return converted.withOrder(stack.order());
     }
 
     /**
