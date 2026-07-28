@@ -80,3 +80,4 @@ gui.mekceuaeupgrade.ae_recipe_config.reset_product.tooltip=Reset route enabled s
 gui.mekceuaeupgrade.ae_recipe_config.reset_all.tooltip=Reset all product and route changes in this config. Hold Shift and click to enable or disable every recipe.
 gui.mekceuaeupgrade.ae_recipe_config.global_amount.tooltip=Set the default craft request amount, then press Enter. The actual value is limited by the current recipe.
 gui.mekceuaeupgrade.ae_recipe_config.route_amount.tooltip=Set the craft request amount for the selected route. Leave empty to inherit the global amount.
+gui.mekceuaeupgrade.qio_storage=QIO: %s

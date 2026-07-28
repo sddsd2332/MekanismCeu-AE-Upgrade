@@ -12,13 +12,13 @@
     "logoFile": "",
     "useDependencyInformation": true,
     "dependencies": [
-      "mekanism",
+      "mekanism@[10.0.3.550,)",
       "ae2",
       "mekeng"
     ],
     "requiredMods": [
       "forge@[14.23.5.2768,)",
-      "mekanism",
+      "mekanism@[10.0.3.550,)",
       "ae2",
       "mekeng"
     ]

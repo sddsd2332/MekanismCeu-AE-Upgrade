@@ -80,3 +80,4 @@ gui.mekceuaeupgrade.ae_recipe_config.reset_product.tooltip=重置当前产物的
 gui.mekceuaeupgrade.ae_recipe_config.reset_all.tooltip=重置当前配置中的全部产物和路线修改。按住 Shift 点击可全部启用或全部关闭配方。
 gui.mekceuaeupgrade.ae_recipe_config.global_amount.tooltip=设置默认一次下单数量，回车提交。实际数量会受当前配方上限限制。
 gui.mekceuaeupgrade.ae_recipe_config.route_amount.tooltip=设置当前路线的一次下单数量，留空则继承全局下单数量。
+gui.mekceuaeupgrade.qio_storage=QIO：%s

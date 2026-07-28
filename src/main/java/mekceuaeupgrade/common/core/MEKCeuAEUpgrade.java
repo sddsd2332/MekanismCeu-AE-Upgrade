@@ -10,6 +10,7 @@ import mekanism.common.Version;
 import mekanism.common.base.IModule;
 import mekanism.common.config.MekanismConfig;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.config.AEUpgradeConfig;
 import mekceuaeupgrade.common.network.MEKCeuAEUpgradePacketHandler;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import mekceuaeupgrade.mekceuaeupgrade.Reference;
@@ -28,7 +29,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = MEKCeuAEUpgrade.MODID, version = Reference.VERSION, useMetadata = true, dependencies = "required-after:mekanism;required-after:ae2;required-after:mekeng")
+@Mod(modid = MEKCeuAEUpgrade.MODID, version = Reference.VERSION, useMetadata = true,
+      dependencies = "required-after:mekanism@[10.0.3.550,);required-after:ae2@[1.0.10,);required-after:mekeng@[1.1.0,)")
 @Mod.EventBusSubscriber
 public class MEKCeuAEUpgrade implements IModule {
 
@@ -73,6 +75,7 @@ public class MEKCeuAEUpgrade implements IModule {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
+        AEUpgradeConfig.load(event.getSuggestedConfigurationFile());
         proxy.preInit();
     }
 
