@@ -1,4 +1,5 @@
 {
+  "required": true,
   "package": "mekceuaeupgrade.mixin",
   "refmap": "mixins.mekceuaeupgrade.refmap.json",
   "target": "@env(DEFAULT)",
@@ -6,7 +7,8 @@
   "compatibilityLevel": "JAVA_8",
   "mixins": [
     "appeng.MixinCraftingGridCache",
-    "appeng.MixinNetworkMonitor"
+    "appeng.MixinNetworkMonitor",
+    "appeng.MixinPlayerData"
   ],
   "server": [],
   "client": []

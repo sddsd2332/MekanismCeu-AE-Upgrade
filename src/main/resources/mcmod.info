@@ -12,7 +12,7 @@
     "logoFile": "${mod_logo_path}",
     "useDependencyInformation": true,
     "dependencies": [
-      "mekanism",
+      "mekanism@[10.0.3.550,)",
       "appliedenergistics2",
       "ae2fc",
       "mekeng",
@@ -20,7 +20,7 @@
     ],
     "requiredMods": [
       "forge@[14.23.5.2768,)",
-      "mekanism",
+      "mekanism@[10.0.3.550,)",
       "appliedenergistics2",
       "ae2fc",
       "mekeng",
