@@ -1,20 +1,19 @@
-package mekceuaeupgrade.mixin.mekanism;
+package mekceuaeupgrade.mixin.mekceumoremachine;
 
 import mekanism.common.Upgrade;
-import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.capabilities.merged.MergedTank;
 import mekanism.common.inventory.slot.InputInventorySlot;
-import mekanism.common.inventory.slot.OutputInventorySlot;
 import mekanism.common.recipe.inputs.FarmInput;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
-import mekanism.common.recipe.outputs.FarmOutput;
-import mekanism.common.tile.prefab.TileEntityFarmMachine;
-import mekanism.common.tile.prefab.TileEntityUpgradeableMachine;
+import mekanism.common.recipe.machines.FarmRecipe;
 import mekceuaeupgrade.common.adapter.AEFarmRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
+import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
+import mekceumoremachine.common.inventory.slot.FarmOutputInventorySlot;
+import mekceumoremachine.common.tile.machine.TierOrganicFarm.TileEntityTierOrganicFarm;
+import net.minecraft.nbt.NBTTagCompound;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,33 +21,33 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-@Mixin(value = TileEntityFarmMachine.class, remap = false)
-public abstract class MixinTileEntityFarmMachine<RECIPE extends FarmMachineRecipe<RECIPE>>
-      extends TileEntityUpgradeableMachine<FarmInput, FarmOutput, RECIPE> implements IAERecipeMachineHost, IAEUpgradeHostBridge {
+@Mixin(value = TileEntityTierOrganicFarm.class, remap = false)
+public abstract class MixinTileEntityTierOrganicFarm implements IAERecipeMachineHost, IAEUpgradeHostBridge {
 
     @Shadow
-    protected InputInventorySlot inputSlot;
-    @Shadow
-    public MergedTank mergedTank;
+    @Final
+    public InputInventorySlot[] inputSlots;
     @Shadow
     @Final
-    protected List<OutputInventorySlot> outputSlots;
+    public List<FarmOutputInventorySlot> outputSlots;
+    @Shadow
+    @Final
+    public int threadCount;
+    @Shadow
+    public MergedTank mergedTank;
     @Unique
     private AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
     @Unique
     private IAERecipeMachineAdapter mekceuaeupgrade$aeRecipeAdapter;
 
-    protected MixinTileEntityFarmMachine(String soundPath, MachineType type, int ticksRequired, int secondaryPerTick) {
-        super(soundPath, type, 5, ticksRequired);
-    }
-
     @Shadow
-    public abstract Map<FarmInput, RECIPE> getRecipes();
+    public abstract Map<FarmInput, FarmRecipe> getRecipes();
 
     @Shadow
     public abstract int getRecipeGasUsagePerOperation();
@@ -65,11 +64,16 @@ public abstract class MixinTileEntityFarmMachine<RECIPE extends FarmMachineRecip
     public IAERecipeMachineAdapter getAERecipeMachineAdapter() {
         if (mekceuaeupgrade$aeRecipeAdapter == null) {
             mekceuaeupgrade$aeRecipeAdapter = AEFarmRecipeAdapters.itemMediumToItems(this::getRecipes,
-                  () -> Collections.singletonList(inputSlot), () -> mergedTank.getGasTank(), () -> mergedTank.getFluidTank(),
-                  () -> outputSlots, () -> 1, this::getRecipeGasUsagePerOperation, this::refreshRecipeLookupCache,
-                  "organic farm");
+                  () -> Arrays.asList(inputSlots), () -> mergedTank.getGasTank(), () -> mergedTank.getFluidTank(),
+                  () -> outputSlots, () -> threadCount, this::getRecipeGasUsagePerOperation, () -> {
+                  }, "tier organic farm");
         }
         return mekceuaeupgrade$aeRecipeAdapter;
+    }
+
+    @Inject(method = "onRecipeCacheInvalidated", at = @At("TAIL"))
+    private void mekceuaeupgrade$onRecipeCacheInvalidated(int cacheIndex, CallbackInfo ci) {
+        mekceuaeupgrade$invalidateAERecipeCache();
     }
 
     @Inject(method = "recalculateUpgradables", at = @At("TAIL"))
@@ -77,5 +81,16 @@ public abstract class MixinTileEntityFarmMachine<RECIPE extends FarmMachineRecip
         if (upgrade == Upgrade.SPEED || upgrade == Upgrade.GAS) {
             mekceuaeupgrade$invalidateAERecipeCache();
         }
+    }
+
+    @Inject(method = "getConfigurationData", at = @At("RETURN"), cancellable = true)
+    private void mekceuaeupgrade$getConfigurationData(NBTTagCompound nbtTags, CallbackInfoReturnable<NBTTagCompound> cir) {
+        cir.setReturnValue(AERecipeProfileManager.writeConfigCardData(
+              (net.minecraft.tileentity.TileEntity) (Object) this, cir.getReturnValue()));
+    }
+
+    @Inject(method = "setConfigurationData", at = @At("TAIL"))
+    private void mekceuaeupgrade$setConfigurationData(NBTTagCompound nbtTags, CallbackInfo ci) {
+        AERecipeProfileManager.readConfigCardData((net.minecraft.tileentity.TileEntity) (Object) this, nbtTags);
     }
 }

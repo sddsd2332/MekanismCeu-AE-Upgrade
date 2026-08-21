@@ -3,6 +3,7 @@ package mekceuaeupgrade.common.recipe.route;
 import mekanism.api.gas.Gas;
 import mekanism.api.gas.GasStack;
 import mekanism.api.processing.MachineRecipeRoute;
+import mekanism.api.recipes.FarmChanceOutput;
 import mekanism.common.recipe.GasConversionHandler;
 import mekanism.common.recipe.RecipeHandler;
 import mekanism.common.recipe.inputs.*;
@@ -145,24 +146,28 @@ public final class AERecipeRouteCollectors {
     }
 
     /**
-     * 收集种植机的物品加气体输入、物品输出路线。
+     * 收集种植机的物品加气体或流体输入、物品输出路线。
      *
      * @param recipes Mekanism farm 配方表
-     * @param gasPerOperation 每次操作消耗的气体量
+     * @param mediumPerOperation 每次操作消耗的混合罐介质量
      * @return 可暴露给 AE 的 route 列表
      */
-    public static List<AERecipeRoute> collectFarmGasToItem(Map<AdvancedMachineInput, ? extends FarmMachineRecipe<?>> recipes,
-          int gasPerOperation) {
-        if (gasPerOperation <= 0) {
+    public static List<AERecipeRoute> collectFarmGasToItem(Map<FarmInput, ? extends FarmMachineRecipe<?>> recipes,
+          int mediumPerOperation) {
+        if (mediumPerOperation <= 0) {
             return Collections.emptyList();
         }
-        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectFarmGasToItem(recipes, gasPerOperation),
+        List<AERecipeRoute> routes = fromCore(MachineRecipeRouteCollectors.collectFarmGasToItem(recipes, mediumPerOperation),
               id -> id + ".fake");
         for (FarmMachineRecipe<?> recipe : recipes.values()) {
-            AdvancedMachineInput input = recipe.getInput();
-            ItemStack output = recipe.getOutput().getMainOutput();
-            addItemGasConversionToItemRoutes(routes, input.itemStack, input.gasType, gasPerOperation, output,
-                  candidate -> farmGasToItemRecipeMatches(recipes, candidate, input.gasType, output));
+            FarmInput input = recipe.getInput();
+            if (!input.isGasInput()) {
+                continue;
+            }
+            FarmOutput output = recipe.getOutput();
+            GasStack requiredGas = scaledGasStack(input.gasInput, mediumPerOperation);
+            addFarmGasConversionToItemRoutes(routes, input.itemStack, requiredGas, output,
+                  candidate -> farmGasToItemRecipeMatches(recipes, candidate, input, output.getGuaranteedOutput()));
         }
         return routes;
     }
@@ -390,6 +395,58 @@ public final class AERecipeRouteCollectors {
                 addItemGasConversionToItemRoute(routes, expandedInput, requiredGas, source, output);
             }
         }
+    }
+
+    private static void addFarmGasConversionToItemRoutes(List<AERecipeRoute> routes, ItemStack itemInput,
+          @Nullable GasStack requiredGas, FarmOutput output, Predicate<ItemStack> acceptsItemInput) {
+        if (!isPositiveGas(requiredGas) || output == null || !output.isValid()) {
+            return;
+        }
+        List<ItemStack> guaranteedOutputs = new ArrayList<>();
+        ItemStack primaryOutput = output.getGuaranteedOutput();
+        if (!isExposableOutput(primaryOutput)) {
+            return;
+        }
+        guaranteedOutputs.add(primaryOutput);
+        for (FarmChanceOutput chanceOutput : output.getChanceOutputs()) {
+            if (chanceOutput.getChance() >= 1 && isExposableOutput(chanceOutput.getOutput())) {
+                guaranteedOutputs.add(chanceOutput.getOutput());
+            }
+        }
+        for (ItemStack expandedInput : AERecipeItemInputs.expand(itemInput, acceptsItemInput)) {
+            for (GasConversionHandler.GasConversionSource source :
+                  GasConversionHandler.getConversionSourcesForGas(requiredGas.getGas())) {
+                addFarmGasConversionToItemRoute(routes, expandedInput, requiredGas, source, guaranteedOutputs);
+            }
+        }
+    }
+
+    private static void addFarmGasConversionToItemRoute(List<AERecipeRoute> routes, ItemStack recipeInput,
+          GasStack requiredGas, GasConversionHandler.GasConversionSource source, List<ItemStack> recipeOutputs) {
+        GasStack sourceGas = source.getGasStack();
+        if (!isExposableInput(recipeInput) || !isMatchingPositiveGas(requiredGas, sourceGas)) {
+            return;
+        }
+        int gcd = gcd(requiredGas.amount, sourceGas.amount);
+        int operations = sourceGas.amount / gcd;
+        int sourceCount = requiredGas.amount / gcd;
+        ItemStack itemInput = scaledStack(recipeInput, operations);
+        GasStack gasInput = scaledGasStack(requiredGas, operations);
+        ItemStack carrier = scaledStack(source.getStack(), sourceCount);
+        if (itemInput.isEmpty() || gasInput == null || carrier.isEmpty()) {
+            return;
+        }
+        AERecipeRoute.Builder builder = AERecipeRoute.builder("route:item_gas_to_item.conversion")
+              .inputItem("item_input", itemInput)
+              .inputGas("gas_input", gasInput, carrier);
+        for (ItemStack recipeOutput : recipeOutputs) {
+            ItemStack scaledOutput = scaledStack(recipeOutput, operations);
+            if (scaledOutput.isEmpty()) {
+                return;
+            }
+            builder.outputItem("item_output", scaledOutput);
+        }
+        routes.add(builder.build());
     }
 
     private static List<AERecipeRoute> fromCore(List<MachineRecipeRoute> coreRoutes, UnaryOperator<String> routeIdMapper) {
@@ -712,13 +769,14 @@ public final class AERecipeRouteCollectors {
         return matched instanceof AdvancedMachineRecipe<?> recipe && ItemStack.areItemStacksEqual(recipe.getOutput().output, output);
     }
 
-    private static boolean farmGasToItemRecipeMatches(Map<AdvancedMachineInput, ? extends FarmMachineRecipe<?>> recipes,
-          ItemStack itemInput, @Nullable Gas gasType, ItemStack output) {
-        if (gasType == null) {
+    private static boolean farmGasToItemRecipeMatches(Map<FarmInput, ? extends FarmMachineRecipe<?>> recipes,
+          ItemStack itemInput, FarmInput recipeInput, ItemStack output) {
+        if (recipeInput == null || !recipeInput.isGasInput()) {
             return false;
         }
-        Object matched = getRecipe(recipes, new AdvancedMachineInput(itemInput.copy(), gasType));
-        return matched instanceof FarmMachineRecipe<?> recipe && ItemStack.areItemStacksEqual(recipe.getOutput().getMainOutput(), output);
+        Object matched = getRecipe(recipes, new FarmInput(itemInput.copy(), recipeInput.gasInput));
+        return matched instanceof FarmMachineRecipe<?> recipe &&
+              ItemStack.areItemStacksEqual(recipe.getOutput().getGuaranteedOutput(), output);
     }
 
     private static boolean nucleosynthesizerRecipeMatches(

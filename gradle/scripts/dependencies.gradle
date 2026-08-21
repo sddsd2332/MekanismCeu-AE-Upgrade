@@ -70,9 +70,10 @@ dependencies {
 
     modImplementation "libs:Mekanism-CE-Unofficial-All:10.0.3.550:dev"
     modImplementation "libs:MekanismCeU-MoreMachine:1.5.0:dev"
-    modImplementation "libs:MekanismMixinHelp:1.1.5:dev"
-    modImplementation "libs:AppliedEnergistics2-Supergiant:1.0.10+f55367e71:dev"
-    modImplementation "libs:mekeng:1.1.0:dev"
+    modImplementation "libs:MekanismMixinHelp:1.2.0:dev"
+    modImplementation "libs:AppliedEnergistics2-Supergiant:1.0.10+70f27657a:dev"
+    modImplementation "libs:mekeng:1.1.1:dev"
 
     modImplementation "curse.maven:had-enough-items-557549:8081514"
+    modImplementation "curse.maven:the-one-probe-community-edition-885670:8547575"
 }

@@ -43,6 +43,9 @@ public final class AEUpgradeOutputDrainer {
         if (stored.isEmpty()) {
             return false;
         }
+        if (isExtractionGuarded(node, slot)) {
+            return false;
+        }
         if (!node.canUseNetwork()) {
             node.markOutputBlocked();
             return false;
@@ -51,6 +54,9 @@ public final class AEUpgradeOutputDrainer {
         int accepted = stored.getCount() - (remainder.isEmpty() ? 0 : remainder.getCount());
         if (accepted <= 0) {
             node.markOutputBlocked();
+            return false;
+        }
+        if (isExtractionGuarded(node, slot)) {
             return false;
         }
         ItemStack extracted = slot.extractItem(accepted, Action.EXECUTE, automationType);
@@ -84,6 +90,9 @@ public final class AEUpgradeOutputDrainer {
         if (stored == null || stored.getGas() == null || stored.amount <= 0) {
             return false;
         }
+        if (isExtractionGuarded(node, tank)) {
+            return false;
+        }
         if (!node.canUseNetwork() || !AEUpgradeGasBridge.isAvailable()) {
             node.markOutputBlocked();
             return false;
@@ -92,6 +101,9 @@ public final class AEUpgradeOutputDrainer {
         int accepted = stored.amount - (remainder == null ? 0 : remainder.amount);
         if (accepted <= 0) {
             node.markOutputBlocked();
+            return false;
+        }
+        if (isExtractionGuarded(node, tank)) {
             return false;
         }
         GasStack extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
@@ -127,6 +139,9 @@ public final class AEUpgradeOutputDrainer {
         if (stored == null || stored.getFluid() == null || stored.amount <= 0) {
             return false;
         }
+        if (isExtractionGuarded(node, tank)) {
+            return false;
+        }
         if (!node.canUseNetwork() || !AEUpgradeFluidBridge.isAvailable()) {
             node.markOutputBlocked();
             return false;
@@ -135,6 +150,9 @@ public final class AEUpgradeOutputDrainer {
         int accepted = stored.amount - (remainder == null ? 0 : remainder.amount);
         if (accepted <= 0) {
             node.markOutputBlocked();
+            return false;
+        }
+        if (isExtractionGuarded(node, tank)) {
             return false;
         }
         FluidStack extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
@@ -151,6 +169,14 @@ public final class AEUpgradeOutputDrainer {
               || (remaining != null && remaining.amount > 0)) {
             node.markOutputBlocked();
         }
+        return true;
+    }
+
+    private static boolean isExtractionGuarded(AEUpgradeNode node, Object container) {
+        if (!node.isContainerExtractionGuarded(container)) {
+            return false;
+        }
+        node.markOutputBlocked();
         return true;
     }
 }

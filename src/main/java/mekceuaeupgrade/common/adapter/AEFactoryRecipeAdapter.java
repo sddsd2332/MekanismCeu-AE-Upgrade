@@ -42,7 +42,6 @@ import mekanism.common.recipe.machines.BasicMachineRecipe;
 import mekanism.common.recipe.machines.Chance2MachineRecipe;
 import mekanism.common.recipe.machines.ChanceMachineRecipe;
 import mekanism.common.recipe.machines.DoubleMachineRecipe;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
 import mekanism.common.recipe.machines.MachineRecipe;
 import mekanism.common.recipe.machines.MetallurgicInfuserRecipe;
 import mekanism.common.recipe.machines.NucleosynthesizerRecipe;
@@ -101,8 +100,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             case SAWING -> AEUpgradeRecipeCache.collectChanceItemRecipes(RecipeHandler.Recipe.PRECISION_SAWMILL.get());
             case EXTRACTOR -> AEUpgradeRecipeCache.collectChanceItemRecipes(RecipeHandler.Recipe.CELL_EXTRACTOR.get());
             case SEPARATOR -> AEUpgradeRecipeCache.collectChanceItemRecipes(RecipeHandler.Recipe.CELL_SEPARATOR.get());
-            case FARM -> AEUpgradeRecipeCache.collectFarmGasItemRecipes(RecipeHandler.Recipe.ORGANIC_FARM.get(),
-                  factory.getAEFactoryGasUsagePerOperation());
             case RECYCLER -> AEUpgradeRecipeCache.collectGuaranteedChance2ItemRecipes(RecipeHandler.Recipe.RECYCLER.get());
             case NUCLEOSYNTHESIZER -> AEUpgradeRecipeCache.collectNucleosynthesizerGasItemRecipes(
                   RecipeHandler.Recipe.ANTIPROTONIC_NUCLEOSYNTHESIZER.get());
@@ -255,8 +252,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             }
             sharedInputs.add(new SharedTransfer(AERecipePort.item("extra_input", extraSlot),
                   AERecipeRouteStack.item("extra_input", stacks.get(1))));
-        } else if (isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory)
-              || isAENucleosynthesizerGasItemRecipeType(factory)) {
+        } else if (isAEAdvancedGasItemRecipeType(factory) || isAENucleosynthesizerGasItemRecipeType(factory)) {
             if (stacks.size() != 2) {
                 return null;
             }
@@ -388,7 +384,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             long required = (long) infuserRecipe.getInput().infuse.getAmount() * operations;
             return provided == required;
         }
-        if (isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory)) {
+        if (isAEAdvancedGasItemRecipeType(factory)) {
             GasStack gasInput = AERecipeRouteLegacyIO.getGasInput(exposedRecipe, stacks, 1, factory::isAEFactoryInputGasValid);
             long required = (long) factory.getAEFactoryGasUsagePerOperation() * operations;
             return gasInput != null && gasInput.getGas() != null && gasInput.amount == required;
@@ -559,9 +555,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         if (isAEAdvancedGasItemRecipeType(factory)) {
             return canAcceptAEAdvancedGasItemInput(factory, processInfo, recipe, input, extra);
         }
-        if (isAEFarmGasItemRecipeType(factory)) {
-            return canAcceptAEFarmGasItemInput(factory, processInfo, recipe, input, extra);
-        }
         if (isAENucleosynthesizerGasItemRecipeType(factory)) {
             return canAcceptAENucleosynthesizerGasItemInput(factory, processInfo, recipe, input, extra);
         }
@@ -593,14 +586,14 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
 
     private boolean supportsAEItemRecipeType(IAEFactoryRecipeHost factory) {
         return switch (factory.getAEFactoryRecipeType()) {
-            case SMELTING, ENRICHING, CRUSHING, STAMPING, ROLLING, BRUSHED, TURNING, COMPRESSING, PURIFYING, INJECTING, COMBINING, AllOY, INFUSING, SAWING, EXTRACTOR, SEPARATOR, FARM, RECYCLER, PRC, NUCLEOSYNTHESIZER -> true;
+            case SMELTING, ENRICHING, CRUSHING, STAMPING, ROLLING, BRUSHED, TURNING, COMPRESSING, PURIFYING, INJECTING, COMBINING, AllOY, INFUSING, SAWING, EXTRACTOR, SEPARATOR, RECYCLER, PRC, NUCLEOSYNTHESIZER -> true;
             default -> false;
         };
     }
 
     private boolean isAEDoubleItemRecipeType(IAEFactoryRecipeHost factory) {
         return factory.getAEFactoryRecipeType() == RecipeType.COMBINING || factory.getAEFactoryRecipeType() == RecipeType.AllOY ||
-              factory.getAEFactoryRecipeType() == RecipeType.INFUSING || isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory) ||
+              factory.getAEFactoryRecipeType() == RecipeType.INFUSING || isAEAdvancedGasItemRecipeType(factory) ||
               isAENucleosynthesizerGasItemRecipeType(factory);
     }
 
@@ -609,16 +602,12 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
               factory.getAEFactoryRecipeType() == RecipeType.INJECTING;
     }
 
-    private boolean isAEFarmGasItemRecipeType(IAEFactoryRecipeHost factory) {
-        return factory.getAEFactoryRecipeType() == RecipeType.FARM;
-    }
-
     private boolean isAENucleosynthesizerGasItemRecipeType(IAEFactoryRecipeHost factory) {
         return factory.getAEFactoryRecipeType() == RecipeType.NUCLEOSYNTHESIZER;
     }
 
     private boolean isAEDirectGasInputRecipeType(IAEFactoryRecipeHost factory) {
-        return isAEAdvancedGasItemRecipeType(factory) || isAEFarmGasItemRecipeType(factory) || isAENucleosynthesizerGasItemRecipeType(factory);
+        return isAEAdvancedGasItemRecipeType(factory) || isAENucleosynthesizerGasItemRecipeType(factory);
     }
 
     private boolean isAEPressurizedRecipeType(IAEFactoryRecipeHost factory) {
@@ -628,7 +617,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
     private boolean isAERecipeSafe(MachineRecipe<?, ?, ?> recipe) {
         return recipe instanceof BasicMachineRecipe<?> || recipe instanceof DoubleMachineRecipe<?> || recipe instanceof ChanceMachineRecipe<?> ||
               recipe instanceof AdvancedMachineRecipe<?> ||
-              recipe instanceof FarmMachineRecipe<?> ||
               recipe instanceof PressurizedRecipe ||
               recipe instanceof NucleosynthesizerRecipe ||
               recipe instanceof MetallurgicInfuserRecipe ||
@@ -641,9 +629,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         }
         if (isAEAdvancedGasItemRecipeType(factory)) {
             return canAcceptAnyAEAdvancedGasItemInput(factory);
-        }
-        if (isAEFarmGasItemRecipeType(factory)) {
-            return canAcceptAnyAEFarmGasItemInput(factory);
         }
         if (isAENucleosynthesizerGasItemRecipeType(factory)) {
             return canAcceptAnyAENucleosynthesizerGasItemInput(factory);
@@ -708,43 +693,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         }
         int requiredGas = MathUtils.clampToInt((long) factory.getAEFactoryGasUsagePerOperation() * operations);
         if (gasStack.amount != requiredGas || !canAEOutputToSlot(processInfo.outputSlot(), recipe.getOutputStack())) {
-            return false;
-        }
-        ItemStack inputRemainder = processInfo.inputSlot().insertItem(input.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-        GasStack fakeGasInput = getAEFakeGasInput(factory, extra);
-        if (fakeGasInput != null) {
-            GasStack gasRemainder = gasTank.insert(fakeGasInput.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-            return inputRemainder.isEmpty() && (gasRemainder == null || gasRemainder.amount <= 0);
-        }
-        return inputRemainder.isEmpty() && extraSlot.insertItem(extra.copy(), Action.SIMULATE, AutomationType.INTERNAL).isEmpty();
-    }
-
-    private boolean canAcceptAEFarmGasItemInput(IAEFactoryRecipeHost factory, IAEFactoryRecipeHost.ProcessView processInfo, AEExposedRecipe recipe,
-          ItemStack input, ItemStack extra) {
-        IInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
-        BasicGasTank gasTank = factory.getAEFactoryGasTank();
-        if (!isAEFarmGasItemRecipeType(factory) || extraSlot == null || gasTank == null) {
-            return false;
-        }
-        GasStack gasStack = AERecipeRouteLegacyIO.getGasInput(recipe, Arrays.asList(input, extra), 1, factory::isAEFactoryInputGasValid);
-        if (gasStack == null || !canAEGasTankAccept(gasTank, gasStack)) {
-            return false;
-        }
-        ItemStack simulatedInput = getSimulatedStackWithInsert(processInfo.inputSlot(), input);
-        MachineRecipe<?, ?, ?> machineRecipe = factory.getAEFactoryRecipe(new AdvancedMachineInput(simulatedInput, gasStack.getGas()));
-        if (!(machineRecipe instanceof FarmMachineRecipe<?> farmRecipe)) {
-            return false;
-        }
-        int operations = getOutputOperations(farmRecipe.getOutput().getMainOutput(), recipe.getOutputStack());
-        if (operations <= 0) {
-            return false;
-        }
-        ItemStack requiredInput = scaledStack(farmRecipe.getInput().itemStack, operations);
-        if (requiredInput.isEmpty() || !MachineInput.inputContains(simulatedInput, requiredInput)) {
-            return false;
-        }
-        int requiredGas = MathUtils.clampToInt((long) factory.getAEFactoryGasUsagePerOperation() * operations);
-        if (gasStack.amount != requiredGas || !canAEFarmOutputsToSlots(farmRecipe, processInfo, operations)) {
             return false;
         }
         ItemStack inputRemainder = processInfo.inputSlot().insertItem(input.copy(), Action.SIMULATE, AutomationType.INTERNAL);
@@ -824,43 +772,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             }
             MachineRecipe<?, ?, ?> recipe = factory.getAEFactoryRecipe(new AdvancedMachineInput(currentInput, gasStack.getGas()));
             if (recipe != null && canAEOutputToSlot(processInfo.outputSlot(), getAEPrimaryRecipeOutput(factory, recipe)) &&
-                hasAEInputRoom(processInfo.inputSlot(), currentInput)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean canAcceptAnyAEFarmGasItemInput(IAEFactoryRecipeHost factory) {
-        IInventorySlot extraSlot = factory.getAEFactoryExtraSlot();
-        BasicGasTank gasTank = factory.getAEFactoryGasTank();
-        IAEFactoryRecipeHost.ProcessView[] processes = factory.getAEFactoryProcesses();
-        if (extraSlot == null || gasTank == null || processes == null) {
-            return false;
-        }
-        ItemStack currentExtra = extraSlot.getStack();
-        if (currentExtra.isEmpty()) {
-            for (IAEFactoryRecipeHost.ProcessView processInfo : processes) {
-                if (hasAEInputRoom(processInfo.inputSlot(), processInfo.inputSlot().getStack())) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        if (extraSlot.getCount() >= extraSlot.getLimit(currentExtra)) {
-            return false;
-        }
-        GasStack gasStack = getAEGasFromSource(factory, currentExtra);
-        if (gasStack == null || !canAEGasTankAccept(gasTank, gasStack)) {
-            return false;
-        }
-        for (IAEFactoryRecipeHost.ProcessView processInfo : processes) {
-            ItemStack currentInput = processInfo.inputSlot().getStack();
-            if (currentInput.isEmpty()) {
-                return true;
-            }
-            MachineRecipe<?, ?, ?> recipe = factory.getAEFactoryRecipe(new AdvancedMachineInput(currentInput, gasStack.getGas()));
-            if (recipe instanceof FarmMachineRecipe<?> farmRecipe && canAEFarmOutputsToSlots(farmRecipe, processInfo, 1) &&
                 hasAEInputRoom(processInfo.inputSlot(), currentInput)) {
                 return true;
             }
@@ -1220,15 +1131,6 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
             return false;
         }
         ItemStack secondaryOutput = getAESecondaryRecipeOutput(factory, recipe);
-        return secondaryOutput.isEmpty() || canAEOutputToSlot(processInfo.secondaryOutputSlot(), secondaryOutput);
-    }
-
-    private boolean canAEFarmOutputsToSlots(FarmMachineRecipe<?> recipe, IAEFactoryRecipeHost.ProcessView processInfo, int operations) {
-        ItemStack primaryOutput = scaledStack(recipe.getOutput().getMainOutput(), operations);
-        if (!primaryOutput.isEmpty() && !canAEOutputToSlot(processInfo.outputSlot(), primaryOutput)) {
-            return false;
-        }
-        ItemStack secondaryOutput = scaledStack(recipe.getOutput().getMaxSecondaryOutput(), operations);
         return secondaryOutput.isEmpty() || canAEOutputToSlot(processInfo.secondaryOutputSlot(), secondaryOutput);
     }
 

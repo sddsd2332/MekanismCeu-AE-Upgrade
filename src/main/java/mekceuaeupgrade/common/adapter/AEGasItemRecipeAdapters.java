@@ -35,7 +35,6 @@ import mekanism.common.recipe.inputs.MachineInput;
 import mekanism.common.recipe.inputs.RotaryInput;
 import mekanism.common.recipe.machines.AdvancedMachineRecipe;
 import mekanism.common.recipe.machines.CrystallizerRecipe;
-import mekanism.common.recipe.machines.FarmMachineRecipe;
 import mekanism.common.recipe.machines.MachineRecipe;
 import mekanism.common.recipe.machines.RotaryRecipe;
 import mekanism.common.recipe.outputs.ChanceOutput;
@@ -710,102 +709,6 @@ public final class AEGasItemRecipeAdapters {
         };
     }
 
-    public static <RECIPE extends FarmMachineRecipe<RECIPE>> IAERecipeMachineAdapter farmItemGasToItem(
-          Supplier<Map<AdvancedMachineInput, RECIPE>> recipes,
-          Supplier<? extends InputInventorySlot> inputSlot,
-          Supplier<? extends GasInventorySlot> gasSlot,
-          Supplier<? extends OutputInventorySlot> outputSlot,
-          Supplier<? extends OutputInventorySlot> secondaryOutputSlot,
-          Supplier<? extends IExtendedGasTank> gasTank,
-          Predicate<Gas> isValidGas,
-          BooleanSupplier supportsRecipes,
-          IntSupplier gasUsagePerOperation,
-          Runnable refreshRecipeLookupCache) {
-        return new IAERecipeMachineAdapter() {
-
-            @Override
-            public Object getRecipeSourceKey(IAEItemRecipeHost host) {
-                return Arrays.asList(recipes.get(), supportsRecipes.getAsBoolean(), gasUsagePerOperation.getAsInt());
-            }
-
-            @Override
-            public List<AEExposedRecipe> getExposedItemRecipes(IAEItemRecipeHost host) {
-                if (!supportsRecipes.getAsBoolean()) {
-                    return Collections.emptyList();
-                }
-                return AEUpgradeRecipeCache.collectFarmGasItemRecipes(recipes.get(), gasUsagePerOperation.getAsInt());
-            }
-
-            @Override
-            public boolean canAcceptItemInput(IAEItemRecipeHost host, AEExposedRecipe recipe, ItemStack stack) {
-                return AEItemRecipeAdapters.reject(host, "farm machine requires item input and gas conversion input");
-            }
-
-            @Override
-            public boolean acceptItemInput(IAEItemRecipeHost host, AEExposedRecipe recipe, ItemStack stack) {
-                return AEItemRecipeAdapters.reject(host, "farm machine requires item input and gas conversion input");
-            }
-
-            @Override
-            public boolean canAcceptItemInputs(IAEItemRecipeHost host, AEExposedRecipe recipe, List<ItemStack> stacks) {
-                return getFarmGasRecipe(host, recipe, stacks, recipes, inputSlot, gasSlot, outputSlot, secondaryOutputSlot, gasTank, isValidGas,
-                      supportsRecipes, gasUsagePerOperation, refreshRecipeLookupCache) != null;
-            }
-
-            @Override
-            public boolean acceptItemInputs(IAEItemRecipeHost host, AEExposedRecipe recipe, List<ItemStack> stacks) {
-                if (getFarmGasRecipe(host, recipe, stacks, recipes, inputSlot, gasSlot, outputSlot, secondaryOutputSlot, gasTank, isValidGas,
-                      supportsRecipes, gasUsagePerOperation, refreshRecipeLookupCache) == null) {
-                    return false;
-                }
-                return acceptItemGasInputs(host, "farm", stacks, inputSlot.get(), gasSlot.get(), gasTank.get(), isValidGas);
-            }
-
-            @Override
-            public boolean canAcceptAnyItemInput(IAEItemRecipeHost host) {
-                InputInventorySlot input = inputSlot.get();
-                GasInventorySlot gas = gasSlot.get();
-                OutputInventorySlot output = outputSlot.get();
-                OutputInventorySlot secondaryOutput = secondaryOutputSlot.get();
-                IExtendedGasTank tank = gasTank.get();
-                if (!supportsRecipes.getAsBoolean() || input == null || gas == null || output == null || secondaryOutput == null || tank == null) {
-                    return false;
-                }
-                ItemStack currentInput = input.getStack();
-                ItemStack currentGasSource = gas.getStack();
-                if (currentGasSource.isEmpty()) {
-                    return currentInput.isEmpty() || AEItemRecipeAdapters.hasInputRoom(input, currentInput);
-                }
-                if (!AEItemRecipeAdapters.hasInputRoom(gas, currentGasSource)) {
-                    return false;
-                }
-                GasStack conversion = getGasFromSource(currentGasSource, isValidGas);
-                if (conversion == null || !canGasTankAccept(tank, conversion)) {
-                    return false;
-                }
-                if (currentInput.isEmpty()) {
-                    return true;
-                }
-                RECIPE recipe = getRecipe(recipes, refreshRecipeLookupCache, currentInput, conversion.getGas());
-                return recipe != null && AEItemRecipeAdapters.hasInputRoom(input, currentInput) &&
-                      canChanceOutputsToSlots(output, secondaryOutput, recipe.getOutput(), 1);
-            }
-
-            @Override
-            public void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
-                observer.accept(inputSlot.get());
-                observer.accept(gasSlot.get());
-                observer.accept(gasTank.get());
-            }
-
-            @Override
-            public boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
-                return AERecipePort.drainAll(node, AERecipePort.item("item_output", outputSlot.get()),
-                      AERecipePort.item("secondary_item_output", secondaryOutputSlot.get()));
-            }
-        };
-    }
-
     @Nullable
     private static <RECIPE extends MachineRecipe<ItemStackInput, GasOutput, RECIPE>> RECIPE getItemToGasRecipe(
           Supplier<Map<ItemStackInput, RECIPE>> recipes, Runnable refreshRecipeLookupCache, ItemStack input) {
@@ -1454,35 +1357,6 @@ public final class AEGasItemRecipeAdapters {
     }
 
     @Nullable
-    private static <RECIPE extends FarmMachineRecipe<RECIPE>> RECIPE getFarmGasRecipe(IAEItemRecipeHost host, AEExposedRecipe exposedRecipe,
-          List<ItemStack> stacks, Supplier<Map<AdvancedMachineInput, RECIPE>> recipes, Supplier<? extends InputInventorySlot> inputSlot,
-          Supplier<? extends GasInventorySlot> gasSlot, Supplier<? extends OutputInventorySlot> outputSlot,
-          Supplier<? extends OutputInventorySlot> secondaryOutputSlot, Supplier<? extends IExtendedGasTank> gasTank, Predicate<Gas> isValidGas,
-          BooleanSupplier supportsRecipes, IntSupplier gasUsagePerOperation, Runnable refreshRecipeLookupCache) {
-        InputInventorySlot input = inputSlot.get();
-        GasInventorySlot gas = gasSlot.get();
-        OutputInventorySlot output = outputSlot.get();
-        OutputInventorySlot secondaryOutput = secondaryOutputSlot.get();
-        IExtendedGasTank tank = gasTank.get();
-        RECIPE recipe = getItemGasRecipe(host, "farm", exposedRecipe, stacks, recipes, input, gas, output, tank, isValidGas, supportsRecipes,
-              gasUsagePerOperation, refreshRecipeLookupCache);
-        if (recipe == null) {
-            return null;
-        }
-        int operations = getOutputOperations(recipe.getOutput().getMainOutput(), exposedRecipe.getOutputStack());
-        if (operations <= 0) {
-            AEItemRecipeAdapters.reject(host, "machine output {} does not match exposed output {}",
-                  AEUpgradeDebug.stack(recipe.getOutput().getMainOutput()), AEUpgradeDebug.outputStack(exposedRecipe));
-            return null;
-        }
-        if (!canChanceOutputsToSlots(output, secondaryOutput, recipe.getOutput(), operations)) {
-            AEItemRecipeAdapters.reject(host, "output slots cannot accept farm route output {}", AEUpgradeDebug.outputStack(exposedRecipe));
-            return null;
-        }
-        return recipe;
-    }
-
-    @Nullable
     private static <OUTPUT extends MachineOutput<?>, RECIPE extends MachineRecipe<AdvancedMachineInput, OUTPUT, RECIPE>> RECIPE getItemGasRecipe(IAEItemRecipeHost host,
           String machineName, AEExposedRecipe exposedRecipe, List<ItemStack> stacks, Supplier<Map<AdvancedMachineInput, RECIPE>> recipes,
           @Nullable InputInventorySlot inputSlot, @Nullable GasInventorySlot gasSlot, @Nullable OutputInventorySlot outputSlot,
@@ -1639,16 +1513,6 @@ public final class AEGasItemRecipeAdapters {
             return chanceOutput.getMainOutput();
         }
         return ItemStack.EMPTY;
-    }
-
-    private static boolean canChanceOutputsToSlots(OutputInventorySlot outputSlot, OutputInventorySlot secondaryOutputSlot, ChanceOutput output,
-          int operations) {
-        ItemStack primaryOutput = scaledStack(output.getMainOutput(), operations);
-        if (!primaryOutput.isEmpty() && !AEItemRecipeAdapters.canOutputToSlot(outputSlot, primaryOutput)) {
-            return false;
-        }
-        ItemStack secondaryOutput = scaledStack(output.getMaxSecondaryOutput(), operations);
-        return secondaryOutput.isEmpty() || AEItemRecipeAdapters.canOutputToSlot(secondaryOutputSlot, secondaryOutput);
     }
 
     private static ItemStack scaledStack(ItemStack stack, int multiplier) {

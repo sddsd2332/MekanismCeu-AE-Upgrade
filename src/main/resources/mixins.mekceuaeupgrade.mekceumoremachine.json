@@ -11,6 +11,7 @@
     "MixinTileEntityTierChemicalWasher",
     "MixinTileEntityTierChemicalCrystallizer",
     "MixinTileEntityTierChemicalDissolutionChamber",
+    "MixinTileEntityTierOrganicFarm",
     "MixinTileEntityTierAmbientAccumulator",
     "MixinTileEntityTierElectricPump",
     "MixinTileEntityTierElectrolyticSeparator",

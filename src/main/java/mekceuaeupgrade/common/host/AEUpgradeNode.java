@@ -35,6 +35,7 @@ import mekanism.api.IContentsListener;
 import mekanism.api.IContentsListenerRegistry;
 import mekanism.api.IContainerTransaction;
 import mekanism.api.gas.GasStack;
+import mekanism.common.tile.prefab.TileEntityContainerBlock;
 import mekanism.common.util.MekanismUtils;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -804,6 +805,11 @@ public class AEUpgradeNode {
 
     public void markOutputBlocked() {
         outputBlocked = true;
+    }
+
+    public boolean isContainerExtractionGuarded(@Nullable Object container) {
+        return host instanceof TileEntityContainerBlock containerHost &&
+              containerHost.isContainerExtractionGuarded(container);
     }
 
     private void refreshNetworkCache() {

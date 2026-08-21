@@ -17,6 +17,7 @@ import mekanism.common.recipe.RecipeHandler;
 import mekanism.common.recipe.inputs.AdvancedMachineInput;
 import mekanism.common.recipe.inputs.DoubleMachineInput;
 import mekanism.common.recipe.inputs.FluidInput;
+import mekanism.common.recipe.inputs.FarmInput;
 import mekanism.common.recipe.inputs.GasAndFluidInput;
 import mekanism.common.recipe.inputs.InfusionInput;
 import mekanism.common.recipe.inputs.ItemStackInput;
@@ -226,9 +227,9 @@ public class AEUpgradeRecipeCache {
         return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectAdvancedGasToItem(recipeMap, gasPerOperation));
     }
 
-    public static List<AEExposedRecipe> collectFarmGasItemRecipes(Map<AdvancedMachineInput, ? extends FarmMachineRecipe<?>> recipeMap,
-          int gasPerOperation) {
-        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectFarmGasToItem(recipeMap, gasPerOperation));
+    public static List<AEExposedRecipe> collectFarmGasItemRecipes(Map<FarmInput, ? extends FarmMachineRecipe<?>> recipeMap,
+          int mediumPerOperation) {
+        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectFarmGasToItem(recipeMap, mediumPerOperation));
     }
 
     public static List<AEExposedRecipe> collectNucleosynthesizerGasItemRecipes(
