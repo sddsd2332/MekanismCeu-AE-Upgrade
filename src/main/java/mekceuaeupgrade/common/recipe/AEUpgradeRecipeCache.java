@@ -198,9 +198,9 @@ public class AEUpgradeRecipeCache {
         return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectAdvancedGasToItem(recipeMap, gasPerOperation));
     }
 
-    public static List<AEExposedRecipe> collectFarmGasItemRecipes(Map<AdvancedMachineInput, ? extends FarmMachineRecipe<?>> recipeMap,
-          int gasPerOperation) {
-        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectFarmGasToItem(recipeMap, gasPerOperation));
+    public static List<AEExposedRecipe> collectFarmGasItemRecipes(Map<FarmInput, ? extends FarmMachineRecipe<?>> recipeMap,
+          int mediumPerOperation) {
+        return AERecipeRoute.toLegacyRecipes(AERecipeRouteCollectors.collectFarmGasToItem(recipeMap, mediumPerOperation));
     }
 
     public static List<AEExposedRecipe> collectNucleosynthesizerGasItemRecipes(

@@ -29,6 +29,7 @@ import mekanism.api.IContentsListener;
 import mekanism.api.IContentsListenerRegistry;
 import mekanism.api.IContainerTransaction;
 import mekanism.api.gas.GasStack;
+import mekanism.common.tile.prefab.TileEntityContainerBlock;
 import mekanism.common.util.MekanismUtils;
 import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.config.AERecipeProfile;
@@ -881,6 +882,12 @@ public class AEUpgradeNode {
     /** 标记当前排空遇到仍有内容但 AE 暂时无法完整接收的端口。 */
     public void markOutputBlocked() {
         outputBlocked = true;
+    }
+
+    /** Returns whether another machine integration currently owns the physical output container. */
+    public boolean isContainerExtractionGuarded(@Nullable Object container) {
+        return host instanceof TileEntityContainerBlock containerHost &&
+              containerHost.isContainerExtractionGuarded(container);
     }
 
     private void requestAutoProcessing() {
