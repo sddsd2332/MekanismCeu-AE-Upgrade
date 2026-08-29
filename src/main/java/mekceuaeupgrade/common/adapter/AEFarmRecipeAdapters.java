@@ -361,7 +361,7 @@ public final class AEFarmRecipeAdapters {
             return false;
         }
         GasStack remainder = tank.insert(stack.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-        return remainder == null || remainder.amount <= 0;
+        return remainder == null || remainder.amount == 0;
     }
 
     private static boolean canInsertFluid(IExtendedFluidTank tank, @Nullable FluidStack stack) {
@@ -369,7 +369,7 @@ public final class AEFarmRecipeAdapters {
             return false;
         }
         FluidStack remainder = tank.insert(stack.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-        return remainder == null || remainder.amount <= 0;
+        return remainder == null || remainder.amount == 0;
     }
 
     private static boolean hasFarmGasRecipe(Map<FarmInput, ?> recipes, mekanism.api.gas.Gas gas) {

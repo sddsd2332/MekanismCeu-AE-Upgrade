@@ -436,7 +436,7 @@ public final class AERecipeRouteCollectors {
         for (MachineRecipeRoute coreRoute : coreRoutes) {
             AERecipeRoute converted = AERecipeRoute.fromMachineRecipeRoute(coreRoute);
             if (converted != null) {
-                routes.add(new AERecipeRoute(routeIdMapper.apply(converted.routeId()), converted.inputs(), converted.outputs()));
+                routes.add(converted.withRouteId(routeIdMapper.apply(converted.routeId())));
             }
         }
         return routes;

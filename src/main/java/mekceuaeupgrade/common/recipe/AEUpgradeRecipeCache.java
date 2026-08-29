@@ -33,7 +33,6 @@ public class AEUpgradeRecipeCache {
     private final IAEUpgradeHost host;
     private final List<AEExposedRecipe> recipes = new ArrayList<>();
     private final List<AEExposedRecipe> autoProcessingRecipes = new ArrayList<>();
-    private final Random priorityRandom = new Random();
     private List<AEExposedRecipe> recipeView = Collections.unmodifiableList(recipes);
     private List<AEExposedRecipe> autoProcessingRecipeView = Collections.unmodifiableList(autoProcessingRecipes);
     private int craftingRecipeVersion = -1;
@@ -44,8 +43,6 @@ public class AEUpgradeRecipeCache {
     private AERecipeProfile lastProfile;
     @Nullable
     private AERecipeProfile lastAutoProcessingProfile;
-    private Object lastRecipeSourceKey;
-    private Object lastAutoProcessingRecipeSourceKey;
 
     public AEUpgradeRecipeCache(IAEUpgradeHost host) {
         this.host = host;
@@ -83,17 +80,14 @@ public class AEUpgradeRecipeCache {
 
     private void rebuildIfNeeded() {
         int currentVersion = RecipeHandler.getGlobalRecipeVersion();
-        Object recipeSourceKey = host instanceof IAEItemRecipeHost itemHost ? itemHost.getAERecipeSourceKey() : null;
         AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.CRAFTING);
         int currentProfileVersion = profile == null ? -1 : profile.getVersion();
-        if (craftingRecipeVersion == currentVersion && profileVersion == currentProfileVersion && profile == lastProfile &&
-            Objects.equals(recipeSourceKey, lastRecipeSourceKey)) {
+        if (craftingRecipeVersion == currentVersion && profileVersion == currentProfileVersion && profile == lastProfile) {
             return;
         }
         craftingRecipeVersion = currentVersion;
         profileVersion = currentProfileVersion;
         lastProfile = profile;
-        lastRecipeSourceKey = recipeSourceKey;
         recipes.clear();
         recipes.addAll(collectCraftingRecipes(host));
         assignPriorities(recipes, profile);
@@ -102,17 +96,14 @@ public class AEUpgradeRecipeCache {
 
     private void rebuildAutoProcessingIfNeeded() {
         int currentVersion = RecipeHandler.getGlobalRecipeVersion();
-        Object recipeSourceKey = host instanceof IAEItemRecipeHost itemHost ? itemHost.getAERecipeSourceKey() : null;
         AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.AUTO_PROCESSING);
         int currentProfileVersion = profile == null ? -1 : profile.getVersion();
-        if (autoProcessingRecipeVersion == currentVersion && autoProcessingProfileVersion == currentProfileVersion && profile == lastAutoProcessingProfile &&
-            Objects.equals(recipeSourceKey, lastAutoProcessingRecipeSourceKey)) {
+        if (autoProcessingRecipeVersion == currentVersion && autoProcessingProfileVersion == currentProfileVersion && profile == lastAutoProcessingProfile) {
             return;
         }
         autoProcessingRecipeVersion = currentVersion;
         autoProcessingProfileVersion = currentProfileVersion;
         lastAutoProcessingProfile = profile;
-        lastAutoProcessingRecipeSourceKey = recipeSourceKey;
         autoProcessingRecipes.clear();
         if (profile != null && profile.getRouteFilterMode() == AERecipeProfile.RouteFilterMode.WHITELIST) {
             autoProcessingRecipes.addAll(collectConfigurableRecipes(host));
@@ -257,7 +248,7 @@ public class AEUpgradeRecipeCache {
     private void assignPriorities(List<AEExposedRecipe> recipes, @Nullable AERecipeProfile profile) {
         Comparator<AEExposedRecipe> comparator = priorityComparator;
         if (comparator == null) {
-            Collections.shuffle(recipes, priorityRandom);
+            recipes.sort(Comparator.comparing(recipe -> recipe.getRecipeKey().getRouteKey()));
         } else {
             recipes.sort(comparator);
         }
@@ -266,9 +257,15 @@ public class AEUpgradeRecipeCache {
             recipes.clear();
             recipes.addAll(filtered);
         }
-        int priority = recipes.size();
+        Map<String, Integer> remainingPriorities = new HashMap<>();
         for (AEExposedRecipe recipe : recipes) {
-            recipe.setPriority(priority--);
+            remainingPriorities.merge(recipe.getRecipeKey().getOutputKey(), 1, Integer::sum);
+        }
+        for (AEExposedRecipe recipe : recipes) {
+            String outputKey = recipe.getRecipeKey().getOutputKey();
+            int priority = remainingPriorities.get(outputKey);
+            recipe.setPriority(priority);
+            remainingPriorities.put(outputKey, priority - 1);
         }
     }
 

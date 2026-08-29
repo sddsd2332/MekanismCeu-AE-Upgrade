@@ -5,6 +5,7 @@
   "minVersion": "0.8",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
+    "mekanism.MixinGasConversionHandler",
     "mekanism.MixinItemConfigurationCard",
     "mekanism.MixinTileEntityAmbientAccumulatorEnergy",
     "mekanism.MixinTileEntityAdvancedElectricMachine",

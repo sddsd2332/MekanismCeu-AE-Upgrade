@@ -680,7 +680,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         GasStack fakeGasInput = getAEFakeGasInput(factory, extra);
         if (fakeGasInput != null) {
             GasStack gasRemainder = gasTank.insert(fakeGasInput.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-            return inputRemainder.isEmpty() && (gasRemainder == null || gasRemainder.amount <= 0);
+            return inputRemainder.isEmpty() && (gasRemainder == null || gasRemainder.amount == 0);
         }
         return inputRemainder.isEmpty() && extraSlot.insertItem(extra.copy(), Action.SIMULATE, AutomationType.INTERNAL).isEmpty();
     }
@@ -718,7 +718,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         GasStack fakeGasInput = getAEFakeGasInput(factory, extra);
         if (fakeGasInput != null) {
             GasStack gasRemainder = gasTank.insert(fakeGasInput.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-            return inputRemainder.isEmpty() && (gasRemainder == null || gasRemainder.amount <= 0);
+            return inputRemainder.isEmpty() && (gasRemainder == null || gasRemainder.amount == 0);
         }
         return inputRemainder.isEmpty() && extraSlot.insertItem(extra.copy(), Action.SIMULATE, AutomationType.INTERNAL).isEmpty();
     }
@@ -904,7 +904,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
         ItemStack itemRemainder = processInfo.inputSlot().insertItem(item.copy(), Action.SIMULATE, AutomationType.INTERNAL);
         FluidStack fluidRemainder = fluidTank.insert(fluid.copy(), Action.SIMULATE, AutomationType.INTERNAL);
         GasStack gasRemainder = gasTank.insert(gas.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-        return itemRemainder.isEmpty() && (fluidRemainder == null || fluidRemainder.amount <= 0) && (gasRemainder == null || gasRemainder.amount <= 0);
+        return itemRemainder.isEmpty() && (fluidRemainder == null || fluidRemainder.amount == 0) && (gasRemainder == null || gasRemainder.amount == 0);
     }
 
     private boolean canAEPressurizedOutputAccept(IAEFactoryRecipeHost factory, IAEFactoryRecipeHost.ProcessView processInfo, PressurizedOutput output) {
@@ -932,7 +932,7 @@ public final class AEFactoryRecipeAdapter implements IAERecipeMachineAdapter {
                 return false;
             }
             GasStack gasRemainder = gasOutTank.insert(gasOutput.copy(), Action.SIMULATE, AutomationType.INTERNAL);
-            return gasRemainder == null || gasRemainder.amount <= 0;
+            return gasRemainder == null || gasRemainder.amount == 0;
         }
         return true;
     }

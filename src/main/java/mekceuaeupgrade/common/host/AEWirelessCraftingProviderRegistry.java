@@ -32,6 +32,14 @@ public final class AEWirelessCraftingProviderRegistry {
         }
     }
 
+    public static synchronized boolean isRegistered(AEUpgradeNode node) {
+        return node != null && GRID_BY_PROVIDER.containsKey(node);
+    }
+
+    public static synchronized boolean isRegistered(AEUpgradeNode node, IGrid grid) {
+        return node != null && grid != null && GRID_BY_PROVIDER.get(node) == grid;
+    }
+
     public static synchronized void provideCrafting(IGrid grid, ICraftingProviderHelper helper) {
         if (grid == null || helper == null || PROVIDERS_BY_GRID.isEmpty()) {
             return;
@@ -46,6 +54,7 @@ public final class AEWirelessCraftingProviderRegistry {
             if (!node.isWirelessCraftingProviderValid() || !node.isWirelessTargetGrid(grid)) {
                 iterator.remove();
                 GRID_BY_PROVIDER.remove(node);
+                node.onWirelessCraftingProviderEvicted(grid);
                 continue;
             }
             node.provideCrafting(helper);

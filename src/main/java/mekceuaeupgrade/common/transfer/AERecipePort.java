@@ -310,7 +310,7 @@ public abstract class AERecipePort {
                 return false;
             }
             GasStack remainder = tank.insert(gas.copy(), action, AutomationType.INTERNAL);
-            return remainder == null || remainder.amount <= 0;
+            return remainder == null || remainder.amount == 0;
         }
 
         @Override
@@ -366,7 +366,7 @@ public abstract class AERecipePort {
                 return false;
             }
             FluidStack remainder = tank.insert(fluid.copy(), action, AutomationType.INTERNAL);
-            return remainder == null || remainder.amount <= 0;
+            return remainder == null || remainder.amount == 0;
         }
 
         @Override

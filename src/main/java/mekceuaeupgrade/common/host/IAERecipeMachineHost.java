@@ -1,6 +1,7 @@
 package mekceuaeupgrade.common.host;
 
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
+import mekceuaeupgrade.common.adapter.AEProviderBackedRecipeAdapter;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import net.minecraft.item.ItemStack;
 
@@ -13,42 +14,46 @@ public interface IAERecipeMachineHost extends IAEItemRecipeHost {
 
     @Override
     default Object getAERecipeSourceKey() {
-        return getAERecipeMachineAdapter().getRecipeSourceKey(this);
+        return AEProviderBackedRecipeAdapter.getRecipeSourceKey(this, this::getAERecipeMachineAdapter);
     }
 
     @Override
     default List<AEExposedRecipe> getAEExposedItemRecipes() {
-        return getAERecipeMachineAdapter().getExposedItemRecipes(this);
+        return AEProviderBackedRecipeAdapter.getExposedItemRecipes(this, this::getAERecipeMachineAdapter);
     }
 
     @Override
     default boolean canAcceptAEItemInput(AEExposedRecipe recipe, ItemStack stack) {
-        return getAERecipeMachineAdapter().canAcceptItemInput(this, recipe, stack);
+        return AEProviderBackedRecipeAdapter.canAcceptItemInput(this, recipe, stack,
+              this::getAERecipeMachineAdapter);
     }
 
     @Override
     default boolean acceptAEItemInput(AEExposedRecipe recipe, ItemStack stack) {
-        return getAERecipeMachineAdapter().acceptItemInput(this, recipe, stack);
+        return AEProviderBackedRecipeAdapter.acceptItemInput(this, recipe, stack,
+              this::getAERecipeMachineAdapter);
     }
 
     @Override
     default boolean canAcceptAEItemInputs(AEExposedRecipe recipe, List<ItemStack> stacks) {
-        return getAERecipeMachineAdapter().canAcceptItemInputs(this, recipe, stacks);
+        return AEProviderBackedRecipeAdapter.canAcceptItemInputs(this, recipe, stacks,
+              this::getAERecipeMachineAdapter);
     }
 
     @Override
     default boolean acceptAEItemInputs(AEExposedRecipe recipe, List<ItemStack> stacks) {
-        return getAERecipeMachineAdapter().acceptItemInputs(this, recipe, stacks);
+        return AEProviderBackedRecipeAdapter.acceptItemInputs(this, recipe, stacks,
+              this::getAERecipeMachineAdapter);
     }
 
     @Override
     default boolean canAcceptAnyAEItemInput() {
-        return getAERecipeMachineAdapter().canAcceptAnyItemInput(this);
+        return AEProviderBackedRecipeAdapter.canAcceptAnyItemInput(this, this::getAERecipeMachineAdapter);
     }
 
     @Override
     default void observeAEInputContainers(Consumer<Object> observer) {
-        getAERecipeMachineAdapter().observeInputContainers(this, observer);
+        AEProviderBackedRecipeAdapter.observeInputContainers(this, observer, this::getAERecipeMachineAdapter);
     }
 
     @Override

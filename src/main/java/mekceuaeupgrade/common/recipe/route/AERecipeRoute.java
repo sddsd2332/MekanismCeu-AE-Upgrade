@@ -22,19 +22,48 @@ import java.util.*;
  * routeId、输入输出顺序、端口 ID 和栈内容会一起参与 route key 计算，用于区分同一产物下的不同路线。</p>
  *
  * @param routeId 路线类型 ID，例如 item_gas_to_item 或 gas_fluid_to_gas
+ * @param recipeKey Provider 分配的物理路线键
+ * @param logicalRecipeKey factory lane 之间共享的逻辑配方键
+ * @param configurationInputs 机器保留且不按批量消耗的配置输入
  * @param inputs 该路线需要的 typed 输入
- * @param outputs 该路线产出的 typed 输出
+ * @param guaranteedOutputs 该路线保证产出的 typed 输出
+ * @param optionalOutputs 该路线可能产出的 typed 输出
  */
 @Desugar
-public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, List<AERecipeRouteStack> outputs) {
+public record AERecipeRoute(
+      String routeId,
+      String recipeKey,
+      String logicalRecipeKey,
+      List<AERecipeRouteStack> configurationInputs,
+      List<AERecipeRouteStack> inputs,
+      List<AERecipeRouteStack> guaranteedOutputs,
+      List<AERecipeRouteStack> optionalOutputs) {
+
+    /**
+     * 保留旧 adapter 使用的最小构造入口。
+     */
+    public AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, List<AERecipeRouteStack> outputs) {
+        this(routeId, "", "", Collections.emptyList(), inputs, outputs, Collections.emptyList());
+    }
 
     /**
      * 规范化 route 数据，并为输入输出栈补上稳定顺序。
      */
     public AERecipeRoute {
         routeId = routeId == null ? "" : routeId;
+        recipeKey = recipeKey == null ? "" : recipeKey;
+        logicalRecipeKey = logicalRecipeKey == null || logicalRecipeKey.isEmpty() ? recipeKey : logicalRecipeKey;
+        configurationInputs = copyWithOrder(configurationInputs);
         inputs = copyWithOrder(inputs);
-        outputs = copyWithOrder(outputs);
+        guaranteedOutputs = copyWithOrder(guaranteedOutputs);
+        optionalOutputs = copyWithOrder(optionalOutputs);
+    }
+
+    /**
+     * 旧调用方所说的 outputs 始终是 AE 能承诺给合成规划器的 guaranteed outputs。
+     */
+    public List<AERecipeRouteStack> outputs() {
+        return guaranteedOutputs;
     }
 
     /**
@@ -51,6 +80,19 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
     public MachineRecipeRoute toMachineRecipeRoute() {
         try {
             MachineRecipeRoute.Builder builder = MachineRecipeRoute.builder(routeId);
+            if (!recipeKey.isEmpty()) {
+                builder.recipeKey(recipeKey);
+            }
+            if (!logicalRecipeKey.isEmpty()) {
+                builder.logicalRecipeKey(logicalRecipeKey);
+            }
+            for (AERecipeRouteStack input : configurationInputs) {
+                MachineResourceStack converted = input.toMachineResourceStack();
+                if (converted == null) {
+                    return null;
+                }
+                builder.configurationInput(converted);
+            }
             for (AERecipeRouteStack input : inputs) {
                 MachineResourceStack converted = input.toMachineResourceStack();
                 if (converted == null) {
@@ -58,12 +100,19 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
                 }
                 builder.input(converted);
             }
-            for (AERecipeRouteStack output : outputs) {
+            for (AERecipeRouteStack output : guaranteedOutputs) {
                 MachineResourceStack converted = output.toMachineResourceStack();
                 if (converted == null) {
                     return null;
                 }
                 builder.output(converted);
+            }
+            for (AERecipeRouteStack output : optionalOutputs) {
+                MachineResourceStack converted = output.toMachineResourceStack();
+                if (converted == null) {
+                    return null;
+                }
+                builder.optionalOutput(converted);
             }
             return builder.build();
         } catch (RuntimeException ignored) {
@@ -76,22 +125,48 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
         if (route == null) {
             return null;
         }
-        Builder builder = builder(route.routeId());
-        for (MachineResourceStack input : route.inputs()) {
-            AERecipeRouteStack converted = AERecipeRouteStack.fromMachineResourceStack(input);
+        List<AERecipeRouteStack> configurationInputs = fromMachineStacks(route.configurationInputs());
+        List<AERecipeRouteStack> inputs = fromMachineStacks(route.inputs());
+        List<AERecipeRouteStack> guaranteedOutputs = fromMachineStacks(route.guaranteedOutputs());
+        List<AERecipeRouteStack> optionalOutputs = fromMachineStacks(route.optionalOutputs());
+        if (configurationInputs == null || inputs == null || guaranteedOutputs == null || optionalOutputs == null) {
+            return null;
+        }
+        return new AERecipeRoute(route.routeId(), route.recipeKey(), route.logicalRecipeKey(), configurationInputs,
+              inputs, guaranteedOutputs, optionalOutputs);
+    }
+
+    @Nullable
+    private static List<AERecipeRouteStack> fromMachineStacks(List<MachineResourceStack> stacks) {
+        List<AERecipeRouteStack> convertedStacks = new ArrayList<>(stacks.size());
+        for (MachineResourceStack stack : stacks) {
+            AERecipeRouteStack converted = AERecipeRouteStack.fromMachineResourceStack(stack);
             if (converted == null) {
                 return null;
             }
-            builder.inputs.add(converted);
+            convertedStacks.add(converted);
         }
-        for (MachineResourceStack output : route.guaranteedOutputs()) {
-            AERecipeRouteStack converted = AERecipeRouteStack.fromMachineResourceStack(output);
-            if (converted == null) {
-                return null;
-            }
-            builder.outputs.add(converted);
+        return convertedStacks;
+    }
+
+    public AERecipeRoute withRouteId(String mappedRouteId) {
+        return new AERecipeRoute(mappedRouteId, recipeKey, logicalRecipeKey, configurationInputs, inputs,
+              guaranteedOutputs, optionalOutputs);
+    }
+
+    /**
+     * 比较 Provider 当前返回的完整路线，防止旧 pattern 被绑定到同名但内容已变化的 route。
+     */
+    public boolean matchesMachineRecipeRoute(@Nullable MachineRecipeRoute route) {
+        if (route == null || !routeId.equals(route.routeId()) || !recipeKey.equals(route.recipeKey()) ||
+            !logicalRecipeKey.equals(route.logicalRecipeKey())) {
+            return false;
         }
-        return builder.build();
+        MachineRecipeRoute converted = toMachineRecipeRoute();
+        return converted != null && converted.configurationInputs().equals(route.configurationInputs()) &&
+              converted.inputs().equals(route.inputs()) &&
+              converted.guaranteedOutputs().equals(route.guaranteedOutputs()) &&
+              converted.optionalOutputs().equals(route.optionalOutputs());
     }
 
     /**
@@ -102,7 +177,7 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
     @Nullable
     public AEExposedRecipe toLegacyRecipe() {
         List<ItemStack> legacyInputs = toLegacyStacks(inputs, 1);
-        List<ItemStack> legacyOutputs = toLegacyStacks(outputs, 1);
+        List<ItemStack> legacyOutputs = toLegacyStacks(guaranteedOutputs, 1);
         if (legacyInputs == null || legacyOutputs == null || legacyInputs.isEmpty() || legacyOutputs.isEmpty()) {
             return null;
         }
@@ -117,7 +192,10 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
         for (AERecipeRouteStack stack : inputs) {
             max = Math.min(max, stack.getMaxCraftAmount());
         }
-        for (AERecipeRouteStack stack : outputs) {
+        for (AERecipeRouteStack stack : guaranteedOutputs) {
+            max = Math.min(max, stack.getMaxCraftAmount());
+        }
+        for (AERecipeRouteStack stack : optionalOutputs) {
             max = Math.min(max, stack.getMaxCraftAmount());
         }
         return Math.max(1, max);
@@ -142,7 +220,7 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
      */
     @Nullable
     public List<ItemStack> toLegacyOutputStacks(int craftAmount) {
-        return toLegacyStacks(outputs, Math.max(1, Math.min(craftAmount, getMaxCraftAmount())));
+        return toLegacyStacks(guaranteedOutputs, Math.max(1, Math.min(craftAmount, getMaxCraftAmount())));
     }
 
     /**
@@ -205,9 +283,13 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
      * @return 用于区分同类配方不同 route 的稳定摘要
      */
     private String getRouteDiscriminator() {
-        StringBuilder builder = new StringBuilder(routeId);
+        StringBuilder builder = new StringBuilder(routeId)
+              .append("|recipe=").append(recipeKey)
+              .append("|logical=").append(logicalRecipeKey);
+        appendStacks(builder.append("|configuration"), configurationInputs);
         appendStacks(builder.append("|in"), inputs);
-        appendStacks(builder.append("|out"), outputs);
+        appendStacks(builder.append("|out"), guaranteedOutputs);
+        appendStacks(builder.append("|optional"), optionalOutputs);
         return hash(builder.toString());
     }
 
@@ -295,14 +377,43 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
     public static final class Builder {
 
         private final String routeId;
+        private String recipeKey = "";
+        private String logicalRecipeKey = "";
+        private final List<AERecipeRouteStack> configurationInputs = new ArrayList<>();
         private final List<AERecipeRouteStack> inputs = new ArrayList<>();
         private final List<AERecipeRouteStack> outputs = new ArrayList<>();
+        private final List<AERecipeRouteStack> optionalOutputs = new ArrayList<>();
 
         /**
          * @param routeId 路线类型 ID
          */
         private Builder(String routeId) {
             this.routeId = routeId;
+        }
+
+        public Builder recipeKey(String recipeKey) {
+            this.recipeKey = recipeKey;
+            return this;
+        }
+
+        public Builder logicalRecipeKey(String logicalRecipeKey) {
+            this.logicalRecipeKey = logicalRecipeKey;
+            return this;
+        }
+
+        public Builder configurationItem(String portId, ItemStack stack) {
+            configurationInputs.add(AERecipeRouteStack.item(portId, stack));
+            return this;
+        }
+
+        public Builder configurationGas(String portId, GasStack stack) {
+            configurationInputs.add(AERecipeRouteStack.gas(portId, stack));
+            return this;
+        }
+
+        public Builder configurationFluid(String portId, FluidStack stack) {
+            configurationInputs.add(AERecipeRouteStack.fluid(portId, stack));
+            return this;
         }
 
         /**
@@ -390,11 +501,27 @@ public record AERecipeRoute(String routeId, List<AERecipeRouteStack> inputs, Lis
             return this;
         }
 
+        public Builder optionalOutputItem(String portId, ItemStack stack) {
+            optionalOutputs.add(AERecipeRouteStack.item(portId, stack));
+            return this;
+        }
+
+        public Builder optionalOutputGas(String portId, GasStack stack) {
+            optionalOutputs.add(AERecipeRouteStack.gas(portId, stack));
+            return this;
+        }
+
+        public Builder optionalOutputFluid(String portId, FluidStack stack) {
+            optionalOutputs.add(AERecipeRouteStack.fluid(portId, stack));
+            return this;
+        }
+
         /**
          * @return 构建完成的 route
          */
         public AERecipeRoute build() {
-            return new AERecipeRoute(routeId, inputs, outputs);
+            return new AERecipeRoute(routeId, recipeKey, logicalRecipeKey, configurationInputs, inputs, outputs,
+                  optionalOutputs);
         }
     }
 }

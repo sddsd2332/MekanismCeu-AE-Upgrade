@@ -789,7 +789,7 @@ public final class AEHybridRecipeAdapters {
         ItemStack itemRemainder = inputSlot.insertItem(item.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
         FluidStack fluidRemainder = fluidTank.insert(fluid.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
         GasStack gasRemainder = gasTank.insert(gas.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
-        return itemRemainder.isEmpty() && (fluidRemainder == null || fluidRemainder.amount <= 0) && (gasRemainder == null || gasRemainder.amount <= 0);
+        return itemRemainder.isEmpty() && (fluidRemainder == null || fluidRemainder.amount == 0) && (gasRemainder == null || gasRemainder.amount == 0);
     }
 
     private static boolean canPressurizedOutputAccept(OutputInventorySlot outputSlot, IExtendedGasTank outputGasTank, PressurizedOutput output) {
@@ -851,8 +851,11 @@ public final class AEHybridRecipeAdapters {
     }
 
     private static boolean canGasStackInsert(IExtendedGasTank gasTank, GasStack stack) {
-        return stack != null && stack.getGas() != null && stack.amount > 0 &&
-              gasTank.insert(stack.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL) == null;
+        if (gasTank == null || stack == null || stack.getGas() == null || stack.amount <= 0) {
+            return false;
+        }
+        GasStack remainder = gasTank.insert(stack.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
+        return remainder == null || remainder.amount == 0;
     }
 
     private static boolean hasMatchingPressurizedGas(Map<PressurizedInput, ?> recipes, @Nullable Gas gas) {

@@ -67,8 +67,15 @@ public final class AEAutoProcessingController {
                   AEUpgradeDebug.outputStacks(acceptedRecipe));
             return false;
         }
-        boolean accepted = node.callMachineContainerTransaction(() ->
-              host.canAcceptAEItemInputs(acceptedRecipe, legacyInputs) && host.acceptAEItemInputs(acceptedRecipe, legacyInputs));
+        inputPlan.beginMachineDelivery();
+        boolean accepted;
+        try {
+            accepted = node.callMachineContainerTransaction(() ->
+                  host.canAcceptAEItemInputs(acceptedRecipe, legacyInputs) && host.acceptAEItemInputs(acceptedRecipe, legacyInputs));
+        } catch (RuntimeException | LinkageError e) {
+            inputPlan.rollback(node);
+            throw e;
+        }
         if (!accepted) {
             inputPlan.rollback(node);
             AEUpgradeDebug.log(host, "auto processing rolled back inputs={} outputs={}",

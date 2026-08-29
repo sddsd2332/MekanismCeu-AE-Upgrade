@@ -3,7 +3,6 @@ package mekceuaeupgrade.common.transfer;
 import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.storage.IMEInventory;
-import appeng.api.storage.IMEMonitor;
 import appeng.api.storage.channels.IFluidStorageChannel;
 import appeng.api.storage.data.IAEFluidStack;
 import appeng.fluids.util.AEFluidStack;
@@ -109,12 +108,6 @@ public final class AEUpgradeFluidBridge {
         }
         try {
             IMEInventory<IAEFluidStack> inventory = node.getInventory(channel);
-            if (inventory instanceof IMEMonitor<?> rawMonitor) {
-                @SuppressWarnings("unchecked")
-                IMEMonitor<IAEFluidStack> monitor = (IMEMonitor<IAEFluidStack>) rawMonitor;
-                IAEFluidStack available = monitor.getStorageList().findPrecise(request);
-                return available != null && available.getStackSize() >= request.getStackSize();
-            }
             IAEFluidStack extracted = inventory.extractItems(request.copy(), Actionable.SIMULATE, node.getActionSource());
             return extracted != null && extracted.getStackSize() >= request.getStackSize();
         } catch (GridAccessException | RuntimeException | LinkageError ignored) {

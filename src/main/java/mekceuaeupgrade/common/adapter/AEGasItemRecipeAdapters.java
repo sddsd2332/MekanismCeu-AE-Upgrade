@@ -710,7 +710,11 @@ public final class AEGasItemRecipeAdapters {
     }
 
     private static boolean canGasOutputToTank(IExtendedGasTank tank, GasStack output) {
-        return output != null && output.amount > 0 && tank.insert(output.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL) == null;
+        if (tank == null || output == null || output.getGas() == null || output.amount <= 0) {
+            return false;
+        }
+        GasStack remainder = tank.insert(output.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
+        return remainder == null || remainder.amount == 0;
     }
 
     private static boolean canFluidInputToTank(IExtendedFluidTank tank, FluidStack input) {
@@ -718,7 +722,7 @@ public final class AEGasItemRecipeAdapters {
             return false;
         }
         FluidStack remainder = tank.insert(input.copy(), mekanism.api.Action.SIMULATE, mekanism.api.AutomationType.INTERNAL);
-        return remainder == null || remainder.amount <= 0;
+        return remainder == null || remainder.amount == 0;
     }
 
     private static boolean canGasPairOutputToTanks(IExtendedGasTank leftTank, IExtendedGasTank rightTank, ChemicalPairOutput output) {

@@ -186,7 +186,7 @@ public final class AERecipeNetworkTransferPlan {
             return false;
         }
         for (ExtractedInput input : inputs) {
-            input.clearExtracted();
+            input.detachPending();
         }
         for (int i = 0; i < inputs.size(); i++) {
             ExtractedInput input = inputs.get(i);
@@ -208,11 +208,20 @@ public final class AERecipeNetworkTransferPlan {
     }
 
     /**
-     * 提交成功事务并清理仅用于回滚的抽取状态。
+     * 在执行机器本地事务前，把全部已抽取输入推进到投递阶段。
+     */
+    public void beginMachineDelivery() {
+        for (ExtractedInput input : inputs) {
+            input.beginDelivery();
+        }
+    }
+
+    /**
+     * 机器完整接收输入后，将 pending buffer 中的资源所有权提交给机器。
      */
     public void commit() {
         for (ExtractedInput input : inputs) {
-            input.clearExtracted();
+            input.commit();
         }
     }
 
@@ -368,7 +377,7 @@ public final class AERecipeNetworkTransferPlan {
             GasStack combined = output.copy();
             combined.amount = (int) amount;
             GasStack remainder = node.injectGas(combined, Actionable.SIMULATE);
-            return remainder == null || remainder.amount <= 0;
+            return remainder == null || remainder.amount == 0;
         }
     }
 
@@ -398,7 +407,7 @@ public final class AERecipeNetworkTransferPlan {
             FluidStack combined = output.copy();
             combined.amount = (int) amount;
             FluidStack remainder = node.injectFluid(combined, Actionable.SIMULATE);
-            return remainder == null || remainder.amount <= 0;
+            return remainder == null || remainder.amount == 0;
         }
     }
 
@@ -408,6 +417,10 @@ public final class AERecipeNetworkTransferPlan {
     private abstract static class ExtractedInput {
 
         private final ItemStack legacyStack;
+        @Nullable
+        private AEPendingTransferBuffer pendingBuffer;
+        @Nullable
+        private AEPendingTransferBuffer.Entry pendingEntry;
 
         /**
          * @param legacyStack AE pattern 对应的旧物品输入
@@ -440,12 +453,38 @@ public final class AERecipeNetworkTransferPlan {
         /**
          * 将已抽出的内容退回 AE。
          */
-        abstract void rollback(AEUpgradeNode node);
+        final void rollback(AEUpgradeNode node) {
+            if (pendingBuffer != null && pendingEntry != null && pendingBuffer.contains(pendingEntry)) {
+                pendingBuffer.deliverToNetwork(pendingEntry, node);
+            }
+            detachPending();
+        }
+
+        final void beginDelivery() {
+            if (pendingBuffer != null && pendingEntry != null && pendingBuffer.contains(pendingEntry)) {
+                pendingBuffer.beginDelivery(pendingEntry);
+            }
+        }
 
         /**
-         * 清理上一次事务留下的真实抽取状态。
+         * 将 buffer 中的资源所有权提交给已经完整接收输入的机器。
          */
-        abstract void clearExtracted();
+        final void commit() {
+            if (pendingBuffer != null && pendingEntry != null && pendingBuffer.contains(pendingEntry)) {
+                pendingBuffer.complete(pendingEntry);
+            }
+            detachPending();
+        }
+
+        final void setPending(AEPendingTransferBuffer buffer, AEPendingTransferBuffer.Entry entry) {
+            pendingBuffer = buffer;
+            pendingEntry = entry;
+        }
+
+        final void detachPending() {
+            pendingBuffer = null;
+            pendingEntry = null;
+        }
     }
 
     /**
@@ -455,7 +494,6 @@ public final class AERecipeNetworkTransferPlan {
 
         private final ItemStack request;
         private final IAEItemStack availabilityRequest;
-        private ItemStack extracted = ItemStack.EMPTY;
 
         /**
          * @param request 请求抽取的物品
@@ -488,28 +526,20 @@ public final class AERecipeNetworkTransferPlan {
 
         @Override
         boolean extract(AEUpgradeNode node) {
+            AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
+            AEPendingTransferBuffer.Entry pending = buffer.prepareItem(request);
             ItemStack result = node.extractItem(request.copy(), Actionable.MODULATE);
-            if (!contains(result, request)) {
-                if (!result.isEmpty()) {
-                    node.injectItem(result, Actionable.MODULATE);
-                }
+            if (result == null || result.isEmpty()) {
+                buffer.cancelPrepared(pending);
                 return false;
             }
-            extracted = result.copy();
-            return true;
-        }
-
-        @Override
-        void rollback(AEUpgradeNode node) {
-            if (!extracted.isEmpty()) {
-                node.injectItem(extracted.copy(), Actionable.MODULATE);
+            buffer.holdItem(pending, result);
+            setPending(buffer, pending);
+            if (!contains(result, request)) {
+                rollback(node);
+                return false;
             }
-            clearExtracted();
-        }
-
-        @Override
-        void clearExtracted() {
-            extracted = ItemStack.EMPTY;
+            return true;
         }
     }
 
@@ -521,8 +551,6 @@ public final class AERecipeNetworkTransferPlan {
         private final GasStack request;
         @Nullable
         private final Object availabilityRequest;
-        @Nullable
-        private GasStack extracted;
 
         /**
          * @param request 请求抽取的气体
@@ -557,28 +585,20 @@ public final class AERecipeNetworkTransferPlan {
 
         @Override
         boolean extract(AEUpgradeNode node) {
+            AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
+            AEPendingTransferBuffer.Entry pending = buffer.prepareGas(request);
             GasStack result = node.extractGas(request.copy(), Actionable.MODULATE);
-            if (!contains(result, request)) {
-                if (result != null && result.amount > 0) {
-                    node.injectGas(result, Actionable.MODULATE);
-                }
+            if (result == null || result.amount <= 0) {
+                buffer.cancelPrepared(pending);
                 return false;
             }
-            extracted = result.copy();
-            return true;
-        }
-
-        @Override
-        void rollback(AEUpgradeNode node) {
-            if (extracted != null && extracted.amount > 0) {
-                node.injectGas(extracted.copy(), Actionable.MODULATE);
+            buffer.holdGas(pending, result);
+            setPending(buffer, pending);
+            if (!contains(result, request)) {
+                rollback(node);
+                return false;
             }
-            clearExtracted();
-        }
-
-        @Override
-        void clearExtracted() {
-            extracted = null;
+            return true;
         }
     }
 
@@ -590,8 +610,6 @@ public final class AERecipeNetworkTransferPlan {
         private final FluidStack request;
         @Nullable
         private final IAEFluidStack availabilityRequest;
-        @Nullable
-        private FluidStack extracted;
 
         /**
          * @param request 请求抽取的流体
@@ -625,28 +643,20 @@ public final class AERecipeNetworkTransferPlan {
 
         @Override
         boolean extract(AEUpgradeNode node) {
+            AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
+            AEPendingTransferBuffer.Entry pending = buffer.prepareFluid(request);
             FluidStack result = node.extractFluid(request.copy(), Actionable.MODULATE);
-            if (!contains(result, request)) {
-                if (result != null && result.amount > 0) {
-                    node.injectFluid(result, Actionable.MODULATE);
-                }
+            if (result == null || result.amount <= 0) {
+                buffer.cancelPrepared(pending);
                 return false;
             }
-            extracted = result.copy();
-            return true;
-        }
-
-        @Override
-        void rollback(AEUpgradeNode node) {
-            if (extracted != null && extracted.amount > 0) {
-                node.injectFluid(extracted.copy(), Actionable.MODULATE);
+            buffer.holdFluid(pending, result);
+            setPending(buffer, pending);
+            if (!contains(result, request)) {
+                rollback(node);
+                return false;
             }
-            clearExtracted();
-        }
-
-        @Override
-        void clearExtracted() {
-            extracted = null;
+            return true;
         }
     }
 
@@ -655,7 +665,7 @@ public final class AERecipeNetworkTransferPlan {
      */
     private static boolean contains(ItemStack actual, ItemStack expected) {
         return actual != null && !actual.isEmpty() && expected != null && !expected.isEmpty() &&
-              actual.getCount() >= expected.getCount() && ItemHandlerHelper.canItemStacksStack(actual, expected);
+              actual.getCount() == expected.getCount() && ItemHandlerHelper.canItemStacksStack(actual, expected);
     }
 
     /**
@@ -663,7 +673,7 @@ public final class AERecipeNetworkTransferPlan {
      */
     private static boolean contains(@Nullable GasStack actual, GasStack expected) {
         return actual != null && expected != null && actual.getGas() != null && expected.getGas() != null &&
-              actual.amount >= expected.amount && actual.isGasEqual(expected);
+              actual.amount == expected.amount && actual.isGasEqual(expected);
     }
 
     /**
@@ -671,7 +681,7 @@ public final class AERecipeNetworkTransferPlan {
      */
     private static boolean contains(@Nullable FluidStack actual, FluidStack expected) {
         return actual != null && expected != null && actual.getFluid() != null && expected.getFluid() != null &&
-              actual.amount >= expected.amount && actual.isFluidEqual(expected);
+              actual.amount == expected.amount && actual.isFluidEqual(expected);
     }
 
     /**

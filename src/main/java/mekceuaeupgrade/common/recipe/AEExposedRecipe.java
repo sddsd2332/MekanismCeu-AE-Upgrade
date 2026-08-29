@@ -1,9 +1,8 @@
 package mekceuaeupgrade.common.recipe;
 
-import appeng.api.AEApi;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
-import appeng.api.storage.channels.IItemStorageChannel;
 import appeng.api.storage.data.IAEItemStack;
+import appeng.util.item.AEItemStack;
 import mekanism.api.gas.GasStack;
 import mekanism.common.recipe.inputs.MachineInput;
 import mekceuaeupgrade.common.config.AERecipeKey;
@@ -27,9 +26,6 @@ import java.util.*;
 
 public class AEExposedRecipe implements ICraftingPatternDetails {
 
-    @Nullable
-    private static IItemStorageChannel itemStorageChannel;
-
     private final List<ItemStack> inputs;
     private final List<ItemStack> outputs;
     private final ItemStack output;
@@ -38,7 +34,8 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
     private final IAEItemStack[] aeCondensedInputs;
     private final IAEItemStack[] aeCondensedOutputs;
     private final AEPatternInput patternInput;
-    private final ItemStack patternStack;
+    @Nullable
+    private ItemStack patternStack;
     private final AERecipeKey recipeKey;
     @Nullable
     private final AERecipeRoute recipeRoute;
@@ -97,7 +94,6 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
         aeCondensedInputs = condenseStacks(aeInputs);
         aeCondensedOutputs = condenseStacks(aeOutputs);
         patternInput = new AEPatternInput(this.inputs);
-        patternStack = createPatternStack(this.inputs, this.outputs, recipeKey);
         this.recipeKey = recipeKey;
         this.recipeRoute = recipeRoute;
         selfReferentialOutput = hasSelfReferentialOutput(this.inputs, this.outputs, recipeRoute);
@@ -141,12 +137,7 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
     }
 
     private static IAEItemStack toAEStack(ItemStack stack) {
-        IItemStorageChannel channel = itemStorageChannel;
-        if (channel == null) {
-            channel = AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
-            itemStorageChannel = channel;
-        }
-        return channel.createStack(stack);
+        return AEItemStack.fromItemStack(stack);
     }
 
     private static ItemStack createPatternStack(List<ItemStack> inputs, List<ItemStack> outputs, AERecipeKey recipeKey) {
@@ -261,7 +252,10 @@ public class AEExposedRecipe implements ICraftingPatternDetails {
     }
 
     @Override
-    public ItemStack getPattern() {
+    public synchronized ItemStack getPattern() {
+        if (patternStack == null) {
+            patternStack = createPatternStack(inputs, outputs, recipeKey);
+        }
         return patternStack.copy();
     }
 
