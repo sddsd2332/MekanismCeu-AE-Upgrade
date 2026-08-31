@@ -97,17 +97,55 @@ public final class AEIncrementalCraftingIndex {
         }
     }
 
-    public synchronized void removeProvider(ICraftingProvider provider) {
-        ProviderState state = providers.get(provider);
+    /**
+     * Removes a provider synchronously. Provider removal is a lifecycle operation rather than a
+     * recipe update: waiting for the grid tick can leave a sidecar recipe visible after AE has
+     * stopped ticking an empty grid.
+     */
+    public synchronized List<IAEItemStack> removeProvider(ICraftingProvider provider) {
+        ProviderState state = providers.remove(provider);
         if (state == null) {
-            return;
+            return Collections.emptyList();
         }
-        state.desired = new LinkedHashMap<>();
+
+        LinkedHashSet<IAEItemStack> affectedOutputs = new LinkedHashSet<>();
+        for (PublishedPattern published : state.published.values()) {
+            affectedOutputs.addAll(published.entry.outputs);
+        }
+        for (ICraftingPatternDetails recipe : state.desired.values()) {
+            affectedOutputs.addAll(normalizeOutputs(recipe));
+        }
+        Map<IAEItemStack, Boolean> previousCraftability = new LinkedHashMap<>();
+        for (IAEItemStack output : affectedOutputs) {
+            previousCraftability.put(output, isCraftable(output));
+        }
+
+        // A provider can have both additions and removals waiting in the bounded reconcile queue.
+        // None of those operations may be allowed to resurrect the provider after this call.
+        pending.removeIf(change -> change.state == state);
+        state.queued.clear();
+        state.desired.clear();
+
+        for (PublishedPattern published : new ArrayList<>(state.published.values())) {
+            removePublished(state, published);
+        }
+        state.published.clear();
         state.removeWhenEmpty = true;
-        for (ICraftingPatternDetails recipe : state.published.keySet()) {
-            queueReconcile(state, recipe);
+
+        if (previousCraftability.isEmpty()) {
+            return Collections.emptyList();
         }
-        cleanupProvider(state);
+        List<IAEItemStack> changed = new ArrayList<>();
+        for (Map.Entry<IAEItemStack, Boolean> entry : previousCraftability.entrySet()) {
+            boolean craftable = isCraftable(entry.getKey());
+            if (craftable != entry.getValue()) {
+                IAEItemStack stack = entry.getKey().copy();
+                stack.reset();
+                stack.setCraftable(craftable);
+                changed.add(stack);
+            }
+        }
+        return changed;
     }
 
     public synchronized List<IAEItemStack> processPendingChanges(Predicate<IAEItemStack> nativeCraftable) {
@@ -355,6 +393,7 @@ public final class AEIncrementalCraftingIndex {
                     entries.remove(entry);
                     if (entries.isEmpty()) {
                         outputs.remove(output);
+                        craftableOutputsDirty = true;
                     }
                 }
             }

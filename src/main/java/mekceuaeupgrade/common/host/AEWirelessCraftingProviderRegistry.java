@@ -20,16 +20,24 @@ public final class AEWirelessCraftingProviderRegistry {
         IGrid previousGrid = GRID_BY_PROVIDER.get(node);
         if (previousGrid != null && previousGrid != grid) {
             removeFromGrid(node, previousGrid);
+            node.onWirelessCraftingProviderEvicted(previousGrid);
         }
+        // A stale set entry must not be able to evict a provider after it has moved to a new
+        // grid. The reverse map is authoritative, but clean all old memberships as well.
+        removeFromOtherGrids(node, grid);
         GRID_BY_PROVIDER.put(node, grid);
         PROVIDERS_BY_GRID.computeIfAbsent(grid, ignored -> new LinkedHashSet<>()).add(node);
     }
 
     public static synchronized void unregister(AEUpgradeNode node) {
+        if (node == null) {
+            return;
+        }
         IGrid grid = GRID_BY_PROVIDER.remove(node);
         if (grid != null) {
             removeFromGrid(node, grid);
         }
+        removeFromOtherGrids(node, null);
     }
 
     public static synchronized boolean isRegistered(AEUpgradeNode node) {
@@ -51,9 +59,13 @@ public final class AEWirelessCraftingProviderRegistry {
         Iterator<AEUpgradeNode> iterator = providers.iterator();
         while (iterator.hasNext()) {
             AEUpgradeNode node = iterator.next();
-            if (!node.isWirelessCraftingProviderValid() || !node.isWirelessTargetGrid(grid)) {
+            IGrid registeredGrid = GRID_BY_PROVIDER.get(node);
+            if (registeredGrid != grid || !node.isWirelessCraftingProviderValid() || !node.isWirelessTargetGrid(grid)) {
                 iterator.remove();
-                GRID_BY_PROVIDER.remove(node);
+                // A stale membership from an old grid must not remove the current registration.
+                if (registeredGrid == grid) {
+                    GRID_BY_PROVIDER.remove(node);
+                }
                 node.onWirelessCraftingProviderEvicted(grid);
                 continue;
             }
@@ -72,6 +84,21 @@ public final class AEWirelessCraftingProviderRegistry {
         providers.remove(node);
         if (providers.isEmpty()) {
             PROVIDERS_BY_GRID.remove(grid);
+        }
+    }
+
+    private static void removeFromOtherGrids(AEUpgradeNode node, IGrid keepGrid) {
+        Iterator<Map.Entry<IGrid, Set<AEUpgradeNode>>> iterator = PROVIDERS_BY_GRID.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<IGrid, Set<AEUpgradeNode>> entry = iterator.next();
+            if (entry.getKey() == keepGrid) {
+                continue;
+            }
+            Set<AEUpgradeNode> providers = entry.getValue();
+            providers.remove(node);
+            if (providers.isEmpty()) {
+                iterator.remove();
+            }
         }
     }
 }

@@ -139,7 +139,10 @@ public class AEUpgradeNode {
     @Nullable
     private IAEIncrementalCraftingGridCache incrementalCraftingCache;
     @Nullable
+    private IGridNode incrementalCraftingNode;
+    @Nullable
     private Collection<? extends ICraftingPatternDetails> incrementalCraftingRecipes;
+    private boolean incrementalCraftingRefreshRequired = true;
     @Nullable
     private IGrid lastWirelessCraftingGrid;
     @Nullable
@@ -243,7 +246,8 @@ public class AEUpgradeNode {
         if (Objects.equals(wirelessCraftingKey, cleaned)) {
             return;
         }
-        if (registeredWirelessCraftingProvider) {
+        if (registeredWirelessCraftingProvider || AEWirelessCraftingProviderRegistry.isRegistered(this) ||
+              incrementalCraftingCache != null) {
             unregisterWirelessCraftingProvider();
         }
         wirelessCraftingKey = cleaned;
@@ -293,6 +297,9 @@ public class AEUpgradeNode {
     }
 
     public void read(NBTTagCompound nbtTags) {
+        // A delegate may be reused across a chunk/world reload. Do not carry a provider from the
+        // previous serialized state into the new network while the upgrade flags are being read.
+        unregisterWirelessCraftingProvider();
         invalidateExposureModeCache();
         proxy.readFromNBT(nbtTags);
         pendingTransfers.read(nbtTags.hasKey(PENDING_TRANSFERS_TAG, NBT.TAG_COMPOUND) ?
@@ -664,6 +671,11 @@ public class AEUpgradeNode {
         if (!networkUsable) {
             unregisterIncrementalCraftingProvider();
         }
+        boolean craftingGridChanged = networkUsable && incrementalCraftingCache != null &&
+              incrementalCraftingGrid != getActiveGrid();
+        if (craftingGridChanged) {
+            unregisterIncrementalCraftingProvider();
+        }
         boolean networkRestored = networkUsable && !lastNetworkUsable;
         if (networkRestored) {
             resetPendingTransferRetrySchedule();
@@ -674,7 +686,7 @@ public class AEUpgradeNode {
             scheduleNextPendingTransferRetry(pendingTransfers.retryNetwork(this));
         }
         boolean pendingTransferBlocked = pendingTransfers.hasOwnedResources();
-        if (networkUsable && (networkRestored || connectionChanged)) {
+        if (networkUsable && (networkRestored || connectionChanged || craftingGridChanged || incrementalCraftingRefreshRequired)) {
             queuePatternChange();
         }
         if (networkUsable && (isCraftingMode(mode) || isAutoProcessingMode(mode)) && refreshRecipeSourceKey()) {
@@ -716,6 +728,7 @@ public class AEUpgradeNode {
         updateWirelessCraftingProviderRegistration();
         ready = true;
         lastNetworkUsable = false;
+        incrementalCraftingRefreshRequired = true;
         notifyConnectionSide(connectionSide);
         refreshNeighborGridNode(connectionSide);
         queuePatternChange();
@@ -763,6 +776,7 @@ public class AEUpgradeNode {
         invalidateNetworkCache();
         resetOutputDrainSchedule();
         resetAutoProcessingSchedule();
+        incrementalCraftingRefreshRequired = true;
         queuePatternChange();
     }
 
@@ -826,6 +840,16 @@ public class AEUpgradeNode {
         boolean exposesCrafting = isCraftingMode(getExposureMode());
         boolean networkUsable = canUseNetwork();
         if (!exposesCrafting || !networkUsable) {
+            // AE can invoke this callback during a native cache rebuild while the node is
+            // already disconnected. Drop any sidecar state instead of leaving an unreachable
+            // provider visible through the query mixins.
+            if (craftingTracker instanceof IAEIncrementalCraftingGridCache incrementalCache) {
+                if (incrementalCraftingCache == incrementalCache) {
+                    unregisterIncrementalCraftingProvider();
+                }
+            } else {
+                unregisterIncrementalCraftingProvider();
+            }
             AEUpgradeDebug.log(host, "skipping crafting provider expose={} networkUsable={}", exposesCrafting, networkUsable);
             return;
         }
@@ -834,12 +858,24 @@ public class AEUpgradeNode {
             AEUpgradeDebug.log(host, "providing {} AE processing recipes", recipes.size());
         }
         if (craftingTracker instanceof IAEIncrementalCraftingGridCache incrementalCache) {
-            publishIncrementalCraftingProvider(incrementalCache, getActiveGrid(), recipes);
+            IGrid providerGrid = incrementalCache.mekceuaeupgrade$getGrid();
+            IGrid activeGrid = getActiveGrid();
+            if (providerGrid != activeGrid) {
+                // A callback from an old cache can race a split/join. Never associate that cache
+                // with the newly resolved grid; the next ready tick will publish to the new one.
+                if (incrementalCraftingCache == incrementalCache && incrementalCraftingGrid == providerGrid) {
+                    unregisterIncrementalCraftingProvider();
+                }
+                return;
+            }
+            publishIncrementalCraftingProvider(incrementalCache, providerGrid, recipes);
             return;
         }
+        unregisterIncrementalCraftingProvider();
         for (AEExposedRecipe recipe : recipes) {
             craftingTracker.addCraftingOption(host, recipe);
         }
+        incrementalCraftingRefreshRequired = false;
     }
 
     public boolean pushPattern(ICraftingPatternDetails patternDetails, InventoryCrafting table) {
@@ -1461,9 +1497,9 @@ public class AEUpgradeNode {
                 return;
             }
             if (grid != lastWirelessCraftingGrid) {
-                if (registeredWirelessCraftingProvider) {
-                    unregisterWirelessCraftingProvider();
-                }
+                // The registry can outlive the node's boolean after a split or an exception.
+                // Always tear down the old registration/cache before adopting the new grid.
+                unregisterWirelessCraftingProvider();
                 lastWirelessCraftingGrid = grid;
                 lastWirelessCraftingNode = node;
                 queuePatternChange();
@@ -1481,26 +1517,37 @@ public class AEUpgradeNode {
     }
 
     private void unregisterWirelessCraftingProvider() {
+        IGrid previousGrid = lastWirelessCraftingGrid;
+        IGridNode previousNode = lastWirelessCraftingNode;
         boolean wasRegistered = registeredWirelessCraftingProvider || AEWirelessCraftingProviderRegistry.isRegistered(this);
         AEWirelessCraftingProviderRegistry.unregister(this);
-        if (wasRegistered) {
-            registeredWirelessCraftingProvider = false;
-            if (!unregisterIncrementalCraftingProvider()) {
-                postPatternChange(lastWirelessCraftingGrid, lastWirelessCraftingNode);
-            }
+        registeredWirelessCraftingProvider = false;
+        boolean sidecarRemoved = unregisterIncrementalCraftingProvider();
+        if (!sidecarRemoved && wasRegistered) {
+            postPatternChange(previousGrid, previousNode);
         }
         lastWirelessCraftingGrid = null;
         lastWirelessCraftingNode = null;
     }
 
     void onWirelessCraftingProviderEvicted(IGrid grid) {
-        if (grid == null || lastWirelessCraftingGrid != grid) {
+        if (grid == null) {
             return;
         }
-        registeredWirelessCraftingProvider = false;
-        unregisterIncrementalCraftingProvider();
-        lastWirelessCraftingGrid = null;
-        lastWirelessCraftingNode = null;
+        boolean sidecarBelongsToGrid = incrementalCraftingGrid == grid;
+        boolean registrationBelongsToGrid = lastWirelessCraftingGrid == grid;
+        if (!sidecarBelongsToGrid && !registrationBelongsToGrid) {
+            return;
+        }
+        boolean sidecarRemoved = sidecarBelongsToGrid && unregisterIncrementalCraftingProvider();
+        if (registrationBelongsToGrid) {
+            registeredWirelessCraftingProvider = false;
+            if (!sidecarRemoved) {
+                postPatternChange(grid, lastWirelessCraftingNode);
+            }
+            lastWirelessCraftingGrid = null;
+            lastWirelessCraftingNode = null;
+        }
     }
 
     private void refreshNetworkCache() {
@@ -1640,7 +1687,11 @@ public class AEUpgradeNode {
         IGrid grid = getActiveGrid();
         IAEIncrementalCraftingGridCache incrementalCache = getIncrementalCraftingCache(grid);
         if (incrementalCache != null) {
-            publishIncrementalCraftingProvider(incrementalCache, grid, recipeCache.getRecipes());
+            IGrid cacheGrid = incrementalCache.mekceuaeupgrade$getGrid();
+            if (cacheGrid != grid) {
+                return;
+            }
+            publishIncrementalCraftingProvider(incrementalCache, cacheGrid, recipeCache.getRecipes());
             return;
         }
         if (postPatternChange()) {
@@ -1653,14 +1704,15 @@ public class AEUpgradeNode {
         if (incrementalCraftingCache != null && (incrementalCraftingCache != cache || incrementalCraftingGrid != grid)) {
             unregisterIncrementalCraftingProvider();
         }
-        if (incrementalCraftingCache == cache && incrementalCraftingGrid == grid && incrementalCraftingRecipes == recipes) {
-            pendingPatternChangeTicks = 0;
-            return;
-        }
+        // The AE cache may have been rebuilt in place and the sidecar may have been cleared by
+        // removeNode. Always reconcile the provider when AE asks for its provider list; object
+        // identity alone cannot prove that the sidecar still contains this provider.
         cache.mekceuaeupgrade$setProviderRecipes(host, host, recipes);
         incrementalCraftingGrid = grid;
         incrementalCraftingCache = cache;
+        incrementalCraftingNode = getActionableNode();
         incrementalCraftingRecipes = recipes;
+        incrementalCraftingRefreshRequired = false;
         pendingPatternChangeTicks = 0;
     }
 
@@ -1680,12 +1732,17 @@ public class AEUpgradeNode {
 
     private boolean unregisterIncrementalCraftingProvider() {
         IAEIncrementalCraftingGridCache cache = incrementalCraftingCache;
+        IGrid grid = incrementalCraftingGrid;
+        IGridNode node = incrementalCraftingNode;
         boolean registered = cache != null;
         incrementalCraftingGrid = null;
         incrementalCraftingCache = null;
+        incrementalCraftingNode = null;
         incrementalCraftingRecipes = null;
+        incrementalCraftingRefreshRequired = true;
         if (cache != null) {
             cache.mekceuaeupgrade$removeProvider(host);
+            postPatternChange(grid, node);
         }
         return registered;
     }
@@ -1701,8 +1758,15 @@ public class AEUpgradeNode {
     }
 
     private boolean postPatternChange(@Nullable IGrid grid, @Nullable IGridNode node) {
-        if (grid == null || node == null) {
+        if (grid == null) {
             return false;
+        }
+        if (node == null) {
+            try {
+                node = grid.getPivot();
+            } catch (RuntimeException | LinkageError ignored) {
+                return false;
+            }
         }
         try {
             grid.postEvent(new MENetworkCraftingPatternChange(host, node));

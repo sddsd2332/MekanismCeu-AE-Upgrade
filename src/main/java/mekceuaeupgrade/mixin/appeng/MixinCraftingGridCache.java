@@ -2,6 +2,8 @@ package mekceuaeupgrade.mixin.appeng;
 
 import appeng.api.AEApi;
 import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridHost;
+import appeng.api.networking.IGridNode;
 import appeng.api.networking.crafting.ICraftingMedium;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
@@ -30,6 +32,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +58,16 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
 
     @Unique
     private final AEIncrementalCraftingIndex mekceuaeupgrade$incrementalCrafting = new AEIncrementalCraftingIndex();
+    @Unique
+    private boolean mekceuaeupgrade$recalculatingPatterns;
+    @Unique
+    private final Set<IAEItemStack> mekceuaeupgrade$pendingCraftabilityChanges = new LinkedHashSet<>();
+
+    @Override
+    @Unique
+    public IGrid mekceuaeupgrade$getGrid() {
+        return grid;
+    }
 
     @Override
     @Unique
@@ -64,8 +78,41 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
 
     @Override
     @Unique
-    public void mekceuaeupgrade$removeProvider(ICraftingProvider provider) {
-        mekceuaeupgrade$incrementalCrafting.removeProvider(provider);
+    public List<IAEItemStack> mekceuaeupgrade$removeProvider(ICraftingProvider provider) {
+        List<IAEItemStack> changed = mekceuaeupgrade$incrementalCrafting.removeProvider(provider);
+        if (!changed.isEmpty()) {
+            if (mekceuaeupgrade$recalculatingPatterns) {
+                for (IAEItemStack stack : changed) {
+                    mekceuaeupgrade$queuePendingCraftabilityChange(stack);
+                }
+            } else {
+                mekceuaeupgrade$postCraftabilityChanges(changed);
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * AE removes providers before the next crafting-cache tick. Keep the sidecar index in the
+     * same lifecycle transition so a provider cannot survive an empty-grid transition.
+     */
+    @Inject(method = "removeNode", at = @At("RETURN"))
+    private void mekceuaeupgrade$removeIncrementalProvider(IGridNode gridNode, IGridHost machine,
+          CallbackInfo ci) {
+        if (machine instanceof ICraftingProvider) {
+            mekceuaeupgrade$removeProvider((ICraftingProvider) machine);
+        }
+    }
+
+    @Inject(method = "recalculateCraftingPatterns", at = @At("HEAD"))
+    private void mekceuaeupgrade$beginPatternRecalculation(CallbackInfo ci) {
+        mekceuaeupgrade$recalculatingPatterns = true;
+    }
+
+    @Inject(method = "recalculateCraftingPatterns", at = @At("RETURN"))
+    private void mekceuaeupgrade$finishPatternRecalculation(CallbackInfo ci) {
+        mekceuaeupgrade$recalculatingPatterns = false;
+        mekceuaeupgrade$flushPendingCraftabilityChanges();
     }
 
 
@@ -73,10 +120,60 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
     private void mekceuaeupgrade$publishIncrementalCrafting(CallbackInfo ci) {
         List<IAEItemStack> changed = mekceuaeupgrade$incrementalCrafting.processPendingChanges(
               stack -> craftableItems.containsKey(stack) || emitableItems.contains(stack));
-        if (!changed.isEmpty() && storageGrid != null) {
-            storageGrid.postCraftablesChanges(AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class), changed,
-                  new BaseActionSource());
+        if (!changed.isEmpty()) {
+            mekceuaeupgrade$postCraftabilityChanges(changed);
         }
+        mekceuaeupgrade$flushPendingCraftabilityChanges();
+    }
+
+    @Unique
+    private void mekceuaeupgrade$postCraftabilityChanges(Iterable<IAEItemStack> changes) {
+        if (changes == null) {
+            return;
+        }
+        if (storageGrid == null) {
+            for (IAEItemStack stack : changes) {
+                mekceuaeupgrade$queuePendingCraftabilityChange(stack);
+            }
+            return;
+        }
+        List<IAEItemStack> filtered = new ArrayList<>();
+        for (IAEItemStack stack : changes) {
+            if (stack == null) {
+                continue;
+            }
+            // A native recipe/emitable item still owns the output after the sidecar provider is
+            // removed, so do not publish a spurious craftability=false transition.
+            if (!stack.isCraftable() && (craftableItems.containsKey(stack) || emitableItems.contains(stack))) {
+                continue;
+            }
+            filtered.add(stack);
+        }
+        if (!filtered.isEmpty()) {
+            storageGrid.postCraftablesChanges(AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class),
+                  filtered, new BaseActionSource());
+        }
+    }
+
+    @Unique
+    private void mekceuaeupgrade$flushPendingCraftabilityChanges() {
+        if (mekceuaeupgrade$pendingCraftabilityChanges.isEmpty()) {
+            return;
+        }
+        List<IAEItemStack> changes = new ArrayList<>(mekceuaeupgrade$pendingCraftabilityChanges);
+        mekceuaeupgrade$pendingCraftabilityChanges.clear();
+        mekceuaeupgrade$postCraftabilityChanges(changes);
+    }
+
+    @Unique
+    private void mekceuaeupgrade$queuePendingCraftabilityChange(IAEItemStack stack) {
+        if (stack == null) {
+            return;
+        }
+        // AE item-stack equality ignores the craftable bit; replace an older transition so a
+        // reconnect that ends in craftable=true cannot be overwritten by a stale false update.
+        mekceuaeupgrade$pendingCraftabilityChanges.remove(stack);
+        mekceuaeupgrade$pendingCraftabilityChanges.add(stack.copy());
     }
 
     @ModifyArg(
