@@ -108,7 +108,7 @@ public record AERecipeRouteStack(
                 case GAS -> MachineResourceStack.gas(portId, gasStack);
                 case FLUID -> MachineResourceStack.fluid(portId, fluidStack);
             };
-            return stack.withOrder(order);
+            return stack == null ? null : stack.withOrder(order);
         } catch (RuntimeException ignored) {
             return null;
         }
@@ -123,8 +123,9 @@ public record AERecipeRouteStack(
             case ITEM -> item(stack.portId(), stack.itemStack());
             case GAS -> gas(stack.portId(), stack.gasStack());
             case FLUID -> fluid(stack.portId(), stack.fluidStack());
+            case CUSTOM -> null;
         };
-        return converted.withOrder(stack.order());
+        return converted == null ? null : converted.withOrder(stack.order());
     }
 
     /**
