@@ -1,0 +1,83 @@
+# Creative tab
+itemGroup.tabmekceuaeupgrade=Mekanism CEu: Улучшения AE
+
+# Items
+item.AECraftingUpgrade.name=Улучшение: "Создание AE"
+item.AEOutputUpgrade.name=Улучшение: "Вывод AE"
+item.AEAutoProcessingUpgrade.name=Улучшение: "Автобработка AE"
+item.AEWirelessCraftingUpgrade.name=Улучшение: "Беспроводное создание AE"
+item.AEWirelessAutoProcessingUpgrade.name=Улучшение: "Беспроводная автобработка AE"
+item.AEWirelessOutputUpgrade.name=Улучшение: "Беспроводной вывод AE"
+
+# Upgrades
+upgrade.ae_crafting=Создание AE
+upgrade.ae_crafting.desc=Позволяет этой машине предоставлять свои рецепты как шаблоны создания AE и принимать задания на создание AE
+upgrade.ae_output=Вывод AE
+upgrade.ae_output.desc=Позволяет этой машине отправлять свои выходы предметов, газа и жидкостей в подключённую сеть AE
+upgrade.ae_auto_processing=Автобработка AE
+upgrade.ae_auto_processing.desc=Позволяет этой машине забирать включённые входы рецептов из подключённой сети AE и обрабатывать их автоматически
+upgrade.ae_wireless_crafting=Беспроводное создание AE
+upgrade.ae_wireless_crafting.desc=Позволяет этой машине предоставлять свои рецепты через сеть AE, привязанную к терминалу безопасности, и принимать задания на создание AE
+upgrade.ae_wireless_auto_processing=Беспроводная автобработка AE
+upgrade.ae_wireless_auto_processing.desc=Позволяет этой машине забирать включённые входы рецептов из сети AE, привязанной к терминалу безопасности, и обрабатывать их автоматически
+upgrade.ae_wireless_output=Беспроводной вывод AE
+upgrade.ae_wireless_output.desc=Позволяет этой машине отправлять выходы предметов, газа и жидкостей в сеть AE, привязанную к терминалу безопасности
+
+# Wireless upgrade tooltip
+tooltip.mekceuaeupgrade.wireless_unlinked=Не привязан к сети AE
+tooltip.mekceuaeupgrade.wireless_linked=Привязан к сети AE
+tooltip.mekceuaeupgrade.wireless_location=Расположение сети
+tooltip.mekceuaeupgrade.wireless_location_unavailable=Расположение сети в данный момент недоступно
+tooltip.mekceuaeupgrade.wireless_cleared=Привязка беспроводной сети AE очищена
+tooltip.mekceuaeupgrade.wireless_already_unlinked=Это беспроводное улучшение не привязано к сети AE
+tooltip.mekceuaeupgrade.wireless_install_unlinked=Сначала привяжите это беспроводное улучшение в терминале безопасности AE
+
+# AE recipe config GUI
+gui.mekceuaeupgrade.ae_recipe_config.title=Конфигурация рецептов AE
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.title=Конфигурация автобработки AE
+gui.mekceuaeupgrade.ae_recipe_config.empty=Нет предоставленных рецептов
+gui.mekceuaeupgrade.ae_recipe_config.no_match=Нет совпадающих продуктов
+gui.mekceuaeupgrade.ae_recipe_config.products=Продукты
+gui.mekceuaeupgrade.ae_recipe_config.products_all=Все
+gui.mekceuaeupgrade.ae_recipe_config.products_multi=Многомаршрутные
+gui.mekceuaeupgrade.ae_recipe_config.products_single=Одномаршрутные
+gui.mekceuaeupgrade.ae_recipe_config.products_self_referential=Тот же ввод/вывод
+gui.mekceuaeupgrade.ae_recipe_config.search=Поиск
+gui.mekceuaeupgrade.ae_recipe_config.routes=Маршруты
+gui.mekceuaeupgrade.ae_recipe_config.enable=Включить
+gui.mekceuaeupgrade.ae_recipe_config.disable=Отключить
+gui.mekceuaeupgrade.ae_recipe_config.reset_product=Сбросить продукт
+gui.mekceuaeupgrade.ae_recipe_config.reset_all=Сбросить всё
+gui.mekceuaeupgrade.ae_recipe_config.multi_route=Несколько маршрутов
+gui.mekceuaeupgrade.ae_recipe_config.global_amount=Глобальное кол-во
+gui.mekceuaeupgrade.ae_recipe_config.route_amount=Кол-во маршрута
+gui.mekceuaeupgrade.ae_recipe_config.amount_inherit=Наследовать
+gui.mekceuaeupgrade.ae_recipe_config.route_enabled=Включён
+gui.mekceuaeupgrade.ae_recipe_config.route_partial=Частично включён
+gui.mekceuaeupgrade.ae_recipe_config.route_disabled=Отключён
+gui.mekceuaeupgrade.ae_recipe_config.route_self_referential=Ввод и вывод используют один и тот же ресурс; этот рецепт не добавлен в AE. Только для просмотра
+gui.mekceuaeupgrade.ae_recipe_config.profile_global=Глобально
+gui.mekceuaeupgrade.ae_recipe_config.profile_single=По машине
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot=Конфиг %s
+gui.mekceuaeupgrade.ae_recipe_config.filter_blacklist=Чёрный список
+gui.mekceuaeupgrade.ae_recipe_config.filter_whitelist=Белый список
+gui.mekceuaeupgrade.ae_recipe_config.disable_product=Отключить все
+gui.mekceuaeupgrade.ae_recipe_config.enable_all=Включить все
+gui.mekceuaeupgrade.ae_recipe_config.disable_all=Отключить все
+gui.mekceuaeupgrade.ae_recipe_config.move_up=Вверх
+gui.mekceuaeupgrade.ae_recipe_config.move_down=Вниз
+gui.mekceuaeupgrade.ae_recipe_config.move_top=Наверх
+gui.mekceuaeupgrade.ae_recipe_config.move_bottom=Вниз
+gui.mekceuaeupgrade.ae_recipe_config.profile_mode.tooltip=Переключение между глобальной конфигурацией и конфигурацией по машине. Конфигурация по машине хранит настройки только для этой машины
+gui.mekceuaeupgrade.ae_recipe_config.profile_slot.tooltip=Переключение глобального слота конфигурации 1-10. ЛКМ — следующий, ПКМ — предыдущий. Скрыто при использовании конфигурации по машине
+gui.mekceuaeupgrade.ae_recipe_config.filter_mode.tooltip=Переключение режима фильтрации рецептов. Чёрный список по умолчанию предоставляет все рецепты; белый список предоставляет только включённые рецепты
+gui.mekceuaeupgrade.ae_recipe_config.product_filter.tooltip=Изменение фильтра списка продуктов слева: все, многомаршрутные, одномаршрутные или совпадающие по вводу/выводу
+gui.mekceuaeupgrade.ae_auto_processing_recipe_config.product_filter.tooltip=Изменение фильтра списка продуктов слева: все, многомаршрутные или одномаршрутные
+gui.mekceuaeupgrade.ae_recipe_config.search.tooltip=Фильтрация списка слева по названию продукта. ПКМ для очистки ввода
+gui.mekceuaeupgrade.ae_recipe_config.toggle_button.tooltip=Клик: включить или отключить выбранный маршрут. Зажать Ctrl и клик: отключить все маршруты для выбранного продукта
+gui.mekceuaeupgrade.ae_recipe_config.move_up_button.tooltip=Клик: повысить приоритет выбранного продукта или маршрута. Зажать Ctrl и клик: переместить наверх
+gui.mekceuaeupgrade.ae_recipe_config.move_down_button.tooltip=Клик: понизить приоритет выбранного продукта или маршрута. Зажать Ctrl и клик: переместить в самый низ
+gui.mekceuaeupgrade.ae_recipe_config.reset_product.tooltip=Сброс состояния включения маршрута, приоритета и изменения количества создания для выбранного продукта
+gui.mekceuaeupgrade.ae_recipe_config.reset_all.tooltip=Сброс всех изменений продуктов и маршрутов в этой конфигурации. Зажать Shift и клик для включения или отключения всех рецептов
+gui.mekceuaeupgrade.ae_recipe_config.global_amount.tooltip=Установка количества запроса создания по умолчанию, затем нажмите Enter. Фактическое значение ограничено текущим рецептом
+gui.mekceuaeupgrade.ae_recipe_config.route_amount.tooltip=Установка количества запроса создания для выбранного маршрута. Оставьте пустым для наследования глобального количества
