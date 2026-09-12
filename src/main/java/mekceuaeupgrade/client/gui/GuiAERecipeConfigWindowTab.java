@@ -1,16 +1,16 @@
 package mekceuaeupgrade.client.gui;
 
 import mekanism.client.SpecialColors;
-import mekanism.client.gui.GuiUtils;
 import mekanism.client.gui.IGuiWrapper;
 import mekanism.client.gui.element.tab.window.GuiWindowCreatorTab;
 import mekanism.client.gui.element.window.GuiWindow;
-import mekanism.client.render.MekanismRenderer;
 import mekanism.common.inventory.container.SelectedWindowData;
 import mekanism.common.tile.prefab.TileEntityContainerBlock;
 import mekceuaeupgrade.common.config.AERecipeConfigType;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
+import mekceuaeupgrade.common.item.AEUpgrade;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
 
@@ -21,10 +21,8 @@ import java.util.function.Supplier;
 public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityContainerBlock, GuiAERecipeConfigWindowTab> {
 
     private static final ResourceLocation AE_CRAFTING_CONFIG = MEKCeuAEUpgrade.rl("textures/items/aecraftingupgrade.png");
-    private static final ResourceLocation AE_AUTO_PROCESSING_CONFIG = MEKCeuAEUpgrade.rl("textures/items/aeautoprocessingupgrade.png");
-    private static final ResourceLocation AE_WIRELESS_OVERLAY = MEKCeuAEUpgrade.rl("textures/items/wifi.png");
     private static final int TAB_ICON_SIZE = 14;
-    private static final int ITEM_TEXTURE_SIZE = 16;
+    private static final float TAB_ITEM_SCALE = TAB_ICON_SIZE / 16F;
 
     protected final AERecipeConfigType configType;
     private boolean windowOpen;
@@ -42,20 +40,22 @@ public class GuiAERecipeConfigWindowTab extends GuiWindowCreatorTab<TileEntityCo
     }
 
     private static ResourceLocation getTabIcon(AERecipeConfigType configType) {
-        return configType == AERecipeConfigType.AUTO_PROCESSING ? AE_AUTO_PROCESSING_CONFIG : AE_CRAFTING_CONFIG;
+        return AE_CRAFTING_CONFIG;
     }
 
     @Override
     protected void drawBackgroundOverlay() {
         int iconX = getButtonX() + (innerWidth - TAB_ICON_SIZE) / 2;
         int iconY = getButtonY() + (innerHeight - TAB_ICON_SIZE) / 2;
-        MekanismRenderer.bindTexture(getOverlay());
-        GuiUtils.blit(iconX, iconY, TAB_ICON_SIZE, TAB_ICON_SIZE, 0, 0, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE);
-        if (hasWirelessUpgrade()) {
-            MekanismRenderer.bindTexture(AE_WIRELESS_OVERLAY);
-            GuiUtils.blit(iconX, iconY, TAB_ICON_SIZE, TAB_ICON_SIZE, 0, 0, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE, ITEM_TEXTURE_SIZE);
+        // Render the registered item stack so animated textures and model layers are handled by Minecraft.
+        gui().renderItemWithOverlay(getTabItem(), iconX, iconY, TAB_ITEM_SCALE, null);
+    }
+
+    private ItemStack getTabItem() {
+        if (configType == AERecipeConfigType.AUTO_PROCESSING) {
+            return (hasWirelessUpgrade() ? AEUpgrade.AE_WIRELESS_AUTO_PROCESSING : AEUpgrade.AE_AUTO_PROCESSING).getStack(1);
         }
-        MekanismRenderer.resetColor();
+        return (hasWirelessUpgrade() ? AEUpgrade.AE_WIRELESS_CRAFTING : AEUpgrade.AE_CRAFTING).getStack(1);
     }
 
     private boolean hasWirelessUpgrade() {

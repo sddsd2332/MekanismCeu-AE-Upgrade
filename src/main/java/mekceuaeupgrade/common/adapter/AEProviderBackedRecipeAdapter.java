@@ -10,6 +10,7 @@ import mekanism.api.processing.MachineResourceStack;
 import mekanism.api.processing.MachineTransferPlan;
 import mekanism.api.processing.ProviderConformanceReport;
 import mekanism.api.processing.QIOAutomationMode;
+import mekanism.common.recipe.RecipeHandler;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHost;
@@ -17,6 +18,7 @@ import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
 import mekceuaeupgrade.common.transfer.AEUpgradeOutputDrainer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.items.ItemHandlerHelper;
@@ -361,7 +363,7 @@ public final class AEProviderBackedRecipeAdapter {
             if (cached != null && cached.identity.equals(identity)) {
                 return cached.context;
             }
-            ProviderConformanceReport report = provider.validateQIOConformance(mode);
+            ProviderConformanceReport report = provider.validateQIOEndpointConformance(mode);
             if (!report.isConformant()) {
                 if (cache != null) {
                     cache.contexts.put(mode, new CachedContext(identity, null));
@@ -369,7 +371,7 @@ public final class AEProviderBackedRecipeAdapter {
                 return null;
             }
             List<MachineRecipeRoute> routes = mode == QIOAutomationMode.SCHEDULED ?
-                  provider.getRecipeRoutes() : Collections.emptyList();
+                  normalizeRoutes(provider.getRecipeRoutes()) : Collections.emptyList();
             List<MachinePort> ports = provider.getPorts();
             Map<String, MachinePort> portsById = indexPorts(ports);
             if (portsById != null && mode == QIOAutomationMode.SCHEDULED &&
@@ -387,6 +389,33 @@ public final class AEProviderBackedRecipeAdapter {
     }
 
     @Nullable
+    private static List<MachineRecipeRoute> normalizeRoutes(List<MachineRecipeRoute> routes) {
+        Map<String, MachineRecipeRoute> unique = new LinkedHashMap<>();
+        for (MachineRecipeRoute route : routes) {
+            if (route == null) return null;
+            MachineRecipeRoute previous = unique.putIfAbsent(route.recipeKey(), route);
+            // Ore dictionary expansion can describe the same route more than once.
+            if (previous != null && (!previous.routeId().equals(route.routeId()) ||
+                  !previous.logicalRecipeKey().equals(route.logicalRecipeKey()) ||
+                  !sameResources(previous.configurationInputs(), route.configurationInputs()) ||
+                  !sameResources(previous.inputs(), route.inputs()) ||
+                  !sameResources(previous.guaranteedOutputs(), route.guaranteedOutputs()) ||
+                  !sameResources(previous.optionalOutputs(), route.optionalOutputs()))) {
+                return null;
+            }
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private static boolean sameResources(List<MachineResourceStack> first, List<MachineResourceStack> second) {
+        if (first.size() != second.size()) return false;
+        for (int i = 0; i < first.size(); i++) {
+            if (!first.get(i).write(new NBTTagCompound()).equals(second.get(i).write(new NBTTagCompound()))) return false;
+        }
+        return true;
+    }
+
+    @Nullable
     private static Map<String, MachinePort> indexPorts(List<MachinePort> ports) {
         if (ports == null || ports.isEmpty()) {
             return null;
@@ -401,7 +430,7 @@ public final class AEProviderBackedRecipeAdapter {
     }
 
     private static boolean capturedRoutesConform(List<MachineRecipeRoute> routes, Map<String, MachinePort> ports) {
-        if (routes == null || routes.isEmpty()) {
+        if (routes == null) {
             return false;
         }
         Set<String> recipeKeys = new HashSet<>();
@@ -413,7 +442,7 @@ public final class AEProviderBackedRecipeAdapter {
             for (MachineResourceStack stack : route.configurationInputs()) {
                 MachinePort port = ports.get(stack.portId());
                 if (!configurationPorts.add(stack.portId()) || port == null || !port.isConfiguration() ||
-                    port.kind() != stack.kind()) {
+                    !stack.isResolved() || !port.acceptsResource(stack)) {
                     return false;
                 }
             }
@@ -430,7 +459,7 @@ public final class AEProviderBackedRecipeAdapter {
           boolean input) {
         for (MachineResourceStack stack : stacks) {
             MachinePort port = ports.get(stack.portId());
-            if (port == null || port.isConfiguration() || port.kind() != stack.kind() ||
+            if (port == null || port.isConfiguration() || !stack.isResolved() || !port.acceptsResource(stack) ||
                 (input && !port.role().acceptsInput()) || (!input && !port.role().allowsOutput())) {
                 return false;
             }
@@ -574,6 +603,7 @@ public final class AEProviderBackedRecipeAdapter {
         @Nullable
         private final Object source;
         private final int configurationRevision;
+        private final int recipeVersion = RecipeHandler.getGlobalRecipeVersion();
 
         private ProviderContextIdentity(ResourceLocation providerId, @Nullable Object source, int configurationRevision) {
             this.providerId = providerId;
@@ -589,13 +619,13 @@ public final class AEProviderBackedRecipeAdapter {
             if (!(obj instanceof ProviderContextIdentity other)) {
                 return false;
             }
-            return configurationRevision == other.configurationRevision && providerId.equals(other.providerId) &&
+            return recipeVersion == other.recipeVersion && configurationRevision == other.configurationRevision && providerId.equals(other.providerId) &&
                   Objects.equals(source, other.source);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(providerId, source, configurationRevision);
+            return Objects.hash(providerId, source, configurationRevision, recipeVersion);
         }
     }
 
@@ -605,6 +635,7 @@ public final class AEProviderBackedRecipeAdapter {
         @Nullable
         private final Object providerSource;
         private final int configurationRevision;
+        private final int recipeVersion = RecipeHandler.getGlobalRecipeVersion();
 
         private ProviderRecipeSourceKey(ResourceLocation providerId, @Nullable Object providerSource,
               int configurationRevision) {
@@ -621,13 +652,13 @@ public final class AEProviderBackedRecipeAdapter {
             if (!(obj instanceof ProviderRecipeSourceKey other)) {
                 return false;
             }
-            return configurationRevision == other.configurationRevision && providerId.equals(other.providerId) &&
+            return recipeVersion == other.recipeVersion && configurationRevision == other.configurationRevision && providerId.equals(other.providerId) &&
                   Objects.equals(providerSource, other.providerSource);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(providerId, providerSource, configurationRevision);
+            return Objects.hash(providerId, providerSource, configurationRevision, recipeVersion);
         }
     }
 

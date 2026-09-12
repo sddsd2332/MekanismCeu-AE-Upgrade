@@ -1,6 +1,5 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekanism.api.gas.Gas;
 import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.capabilities.gas.BasicGasTank;
 import mekanism.common.inventory.slot.InputInventorySlot;
@@ -47,11 +46,6 @@ public abstract class MixinTileEntityAntiprotonicNucleosynthesizer
     @Shadow
     public abstract Map<NucleosynthesizerInput, NucleosynthesizerRecipe> getRecipes();
 
-    @Shadow
-    private boolean isValidGas(Gas gas) {
-        return false;
-    }
-
     @Override
     public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
         if (mekceuaeupgrade$aeUpgrade == null) {
@@ -64,7 +58,8 @@ public abstract class MixinTileEntityAntiprotonicNucleosynthesizer
     public IAERecipeMachineAdapter getAERecipeMachineAdapter() {
         if (mekceuaeupgrade$aeRecipeAdapter == null) {
             mekceuaeupgrade$aeRecipeAdapter = AEHybridRecipeAdapters.nucleosynthesizerItemGasToItem(this::getRecipes,
-                  () -> inputSlot, () -> gasInputSlot, () -> outputSlot, () -> inputGasTank, this::isValidGas, this::refreshRecipeLookupCache);
+                  () -> inputSlot, () -> gasInputSlot, () -> outputSlot, () -> inputGasTank, gas -> inputGasTank.isValid(gas),
+                  this::refreshRecipeLookupCache);
         }
         return mekceuaeupgrade$aeRecipeAdapter;
     }

@@ -83,13 +83,13 @@ public abstract class MixinTileEntityTierOrganicFarm implements IAERecipeMachine
         }
     }
 
-    @Inject(method = "getConfigurationData", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getConfigurationData", at = @At("RETURN"), cancellable = true, require = 1)
     private void mekceuaeupgrade$getConfigurationData(NBTTagCompound nbtTags, CallbackInfoReturnable<NBTTagCompound> cir) {
         cir.setReturnValue(AERecipeProfileManager.writeConfigCardData(
               (net.minecraft.tileentity.TileEntity) (Object) this, cir.getReturnValue()));
     }
 
-    @Inject(method = "setConfigurationData", at = @At("TAIL"))
+    @Inject(method = "setConfigurationData", at = @At("TAIL"), require = 1)
     private void mekceuaeupgrade$setConfigurationData(NBTTagCompound nbtTags, CallbackInfo ci) {
         AERecipeProfileManager.readConfigCardData((net.minecraft.tileentity.TileEntity) (Object) this, nbtTags);
     }

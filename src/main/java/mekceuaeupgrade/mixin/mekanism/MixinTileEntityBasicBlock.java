@@ -1,6 +1,5 @@
 package mekceuaeupgrade.mixin.mekanism;
 
-import mekanism.common.tile.base.TileEntityRestrictedTick;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import net.minecraft.block.Block;
@@ -14,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import javax.annotation.Nullable;
 
 @Mixin(value = TileEntityBasicBlock.class, remap = false)
-public abstract class MixinTileEntityBasicBlock extends TileEntityRestrictedTick {
+public abstract class MixinTileEntityBasicBlock {
 
     @Inject(method = "onLoad", at = @At("TAIL"))
     private void mekceuaeupgrade$onLoad(CallbackInfo ci) {
@@ -24,29 +23,12 @@ public abstract class MixinTileEntityBasicBlock extends TileEntityRestrictedTick
         }
     }
 
-    @Inject(method = "validate", at = @At("TAIL"))
-    private void mekceuaeupgrade$validate(CallbackInfo ci) {
-        IAEUpgradeHostBridge bridge = mekceuaeupgrade$getAEBridge();
-        if (bridge != null) {
-            bridge.mekceuaeupgrade$validateAEUpgrade();
-        }
-    }
-
     @Inject(method = "invalidate", at = @At("HEAD"))
     private void mekceuaeupgrade$invalidate(CallbackInfo ci) {
         IAEUpgradeHostBridge bridge = mekceuaeupgrade$getAEBridge();
         if (bridge != null) {
             bridge.mekceuaeupgrade$invalidateAEUpgrade();
         }
-    }
-
-    @Override
-    public void onChunkUnload() {
-        IAEUpgradeHostBridge bridge = mekceuaeupgrade$getAEBridge();
-        if (bridge != null) {
-            bridge.mekceuaeupgrade$onAEUpgradeChunkUnload();
-        }
-        super.onChunkUnload();
     }
 
     @Inject(method = "onNeighborChange", at = @At("TAIL"))

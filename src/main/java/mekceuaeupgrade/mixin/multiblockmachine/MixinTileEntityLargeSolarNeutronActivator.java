@@ -33,11 +33,6 @@ public abstract class MixinTileEntityLargeSolarNeutronActivator implements IAERe
     @Unique
     private IAERecipeMachineAdapter mekceuaeupgrade$aeRecipeAdapter;
 
-    @Shadow
-    private void refreshRecipeLookupCache() {
-        throw new AssertionError();
-    }
-
     @Override
     public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
         if (mekceuaeupgrade$aeUpgrade == null) {
@@ -50,7 +45,7 @@ public abstract class MixinTileEntityLargeSolarNeutronActivator implements IAERe
     public IAERecipeMachineAdapter getAERecipeMachineAdapter() {
         if (mekceuaeupgrade$aeRecipeAdapter == null) {
             mekceuaeupgrade$aeRecipeAdapter = AEGasItemRecipeAdapters.gasToGas(() -> RecipeHandler.Recipe.SOLAR_NEUTRON_ACTIVATOR.get(),
-                  () -> inputTank, () -> outputTank, this::refreshRecipeLookupCache, "large solar neutron activator");
+                  () -> inputTank, () -> outputTank, () -> {}, "large solar neutron activator");
         }
         return mekceuaeupgrade$aeRecipeAdapter;
     }

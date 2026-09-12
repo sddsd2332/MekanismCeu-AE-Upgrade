@@ -38,11 +38,6 @@ public abstract class MixinTileEntityTierSolarNeutronActivator implements IAERec
     private IAERecipeMachineAdapter mekceuaeupgrade$aeRecipeAdapter;
 
     @Shadow
-    private void refreshRecipeLookupCache() {
-        throw new AssertionError();
-    }
-
-    @Shadow
     public abstract Map<GasInput, SolarNeutronRecipe> getRecipes();
 
     @Override
@@ -57,7 +52,7 @@ public abstract class MixinTileEntityTierSolarNeutronActivator implements IAERec
     public IAERecipeMachineAdapter getAERecipeMachineAdapter() {
         if (mekceuaeupgrade$aeRecipeAdapter == null) {
             mekceuaeupgrade$aeRecipeAdapter = AEGasItemRecipeAdapters.gasToGas(this::getRecipes, () -> inputTank, () -> outputTank,
-                  this::refreshRecipeLookupCache, "tier solar neutron");
+                  () -> {}, "tier solar neutron");
         }
         return mekceuaeupgrade$aeRecipeAdapter;
     }

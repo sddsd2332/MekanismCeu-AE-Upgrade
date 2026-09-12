@@ -204,7 +204,17 @@ public final class AEIncrementalCraftingIndex {
           Collection<ICraftingPatternDetails> nativePatterns) {
         ImmutableList<ICraftingPatternDetails> incrementalPatterns = craftingByOutput.get(output);
         if (incrementalPatterns == null || incrementalPatterns.isEmpty()) {
-            return nativePatterns == null ? ImmutableList.of() : ImmutableList.copyOf(nativePatterns);
+            if (nativePatterns == null) {
+                return ImmutableList.of();
+            }
+            // Native AE already returns an immutable collection. Preserve it so ordinary
+            // AE-only lookups do not pay for a copy through this sidecar.
+            if (nativePatterns instanceof ImmutableList) {
+                @SuppressWarnings("unchecked")
+                ImmutableList<ICraftingPatternDetails> immutable = (ImmutableList<ICraftingPatternDetails>) nativePatterns;
+                return immutable;
+            }
+            return ImmutableList.copyOf(nativePatterns);
         }
         if (nativePatterns == null || nativePatterns.isEmpty()) {
             return incrementalPatterns;
@@ -248,7 +258,15 @@ public final class AEIncrementalCraftingIndex {
     public static ImmutableList<ICraftingPatternDetails> mergePatterns(Collection<ICraftingPatternDetails> nativePatterns,
           Collection<ICraftingPatternDetails> incrementalPatterns) {
         if (incrementalPatterns == null || incrementalPatterns.isEmpty()) {
-            return nativePatterns == null ? ImmutableList.of() : ImmutableList.copyOf(nativePatterns);
+            if (nativePatterns == null) {
+                return ImmutableList.of();
+            }
+            if (nativePatterns instanceof ImmutableList) {
+                @SuppressWarnings("unchecked")
+                ImmutableList<ICraftingPatternDetails> immutable = (ImmutableList<ICraftingPatternDetails>) nativePatterns;
+                return immutable;
+            }
+            return ImmutableList.copyOf(nativePatterns);
         }
         if (nativePatterns == null || nativePatterns.isEmpty()) {
             return immutableList(incrementalPatterns);

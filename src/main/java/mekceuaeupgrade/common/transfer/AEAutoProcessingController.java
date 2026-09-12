@@ -1,7 +1,7 @@
 package mekceuaeupgrade.common.transfer;
 
 import mekceuaeupgrade.common.host.AEUpgradeNode;
-import mekceuaeupgrade.common.host.IAEFactoryRecipeHost;
+import mekanism.common.tile.factory.TileEntityFactory;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.util.AEUpgradeDebug;
@@ -49,7 +49,7 @@ public final class AEAutoProcessingController {
      */
     private static boolean tryProcessRecipe(AEUpgradeNode node, IAEItemRecipeHost host, AEExposedRecipe recipe) {
         PreparedRecipe prepared = prepareRecipe(node, host, recipe);
-        if (prepared == null && host instanceof IAEFactoryRecipeHost && recipe.getCraftAmount() > 1) {
+        if (prepared == null && host instanceof TileEntityFactory && recipe.getCraftAmount() > 1) {
             prepared = findLargestFactoryBatch(node, host, recipe);
         }
         if (prepared == null) {
