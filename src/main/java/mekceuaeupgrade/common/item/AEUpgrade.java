@@ -98,16 +98,37 @@ public final class AEUpgrade {
     private AEUpgrade() {
     }
 
+    private static final boolean CLASS_SUPPORT_API = findClassSupportApi();
+
+    public static boolean hasClassSupportApi() { return CLASS_SUPPORT_API; }
+
+    private static boolean findClassSupportApi() {
+        try {
+            ExternalUpgradeSupportRegistry.class.getMethod("registerClassSupport", net.minecraft.util.ResourceLocation.class,
+                  java.util.function.Predicate.class, mekanism.common.Upgrade[].class);
+            ExternalUpgradeSupportRegistry.class.getMethod("isSupportStable", mekanism.common.Upgrade.class);
+            return true;
+        } catch (ReflectiveOperationException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    private static void registerTypeSupport(net.minecraft.util.ResourceLocation id,
+          java.util.function.Predicate<Class<?>> predicate, mekanism.common.Upgrade... upgrades) {
+        if (CLASS_SUPPORT_API) ExternalUpgradeSupportRegistry.registerClassSupport(id, predicate, upgrades);
+        else ExternalUpgradeSupportRegistry.register(id, tile -> predicate.test(tile.getClass()), upgrades);
+    }
+
     public static void registerExternalSupport() {
-        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("crafting_upgrade_support"),
-              tile -> tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost,
+        registerTypeSupport(MEKCeuAEUpgrade.rl("crafting_upgrade_support"),
+              type -> IRecipeLookupHandler.class.isAssignableFrom(type) && IAEUpgradeHost.class.isAssignableFrom(type),
               AE_CRAFTING, AE_WIRELESS_CRAFTING);
-        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("auto_processing_upgrade_support"),
-              tile -> tile instanceof IAEItemRecipeHost,
+        registerTypeSupport(MEKCeuAEUpgrade.rl("auto_processing_upgrade_support"),
+              type -> IAEItemRecipeHost.class.isAssignableFrom(type),
               AE_AUTO_PROCESSING, AE_WIRELESS_AUTO_PROCESSING);
-        ExternalUpgradeSupportRegistry.register(MEKCeuAEUpgrade.rl("output_upgrade_support"),
-              tile -> !(tile instanceof IRecipeLookupHandler<?> && tile instanceof IAEUpgradeHost) &&
-                      !(tile instanceof IAEItemRecipeHost) && tile instanceof IAEOutputHost,
+        registerTypeSupport(MEKCeuAEUpgrade.rl("output_upgrade_support"),
+              type -> !(IRecipeLookupHandler.class.isAssignableFrom(type) && IAEUpgradeHost.class.isAssignableFrom(type)) &&
+                      !IAEItemRecipeHost.class.isAssignableFrom(type) && IAEOutputHost.class.isAssignableFrom(type),
               AE_OUTPUT, AE_WIRELESS_OUTPUT);
     }
 

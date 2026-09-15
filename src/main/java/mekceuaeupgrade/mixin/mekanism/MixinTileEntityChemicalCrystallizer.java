@@ -11,6 +11,7 @@ import mekanism.common.tile.prefab.TileEntityBasicMachine;
 import mekceuaeupgrade.common.adapter.AEGasItemRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,7 +29,10 @@ public abstract class MixinTileEntityChemicalCrystallizer extends TileEntityBasi
     @Shadow
     private OutputInventorySlot outputSlot;
     @Unique
-    private AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+    private volatile AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+
+    @Unique
+    private volatile AEUpgradeNode mekceuaeupgrade$cachedNode;
     @Unique
     private IAERecipeMachineAdapter mekceuaeupgrade$aeRecipeAdapter;
 
@@ -40,11 +44,28 @@ public abstract class MixinTileEntityChemicalCrystallizer extends TileEntityBasi
     public abstract Map<GasInput, CrystallizerRecipe> getRecipes();
 
     @Override
-    public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
-        if (mekceuaeupgrade$aeUpgrade == null) {
-            mekceuaeupgrade$aeUpgrade = new AEUpgradeHostDelegate(this);
+    public AEUpgradeNode getAEUpgradeNode() {
+        AEUpgradeNode node = mekceuaeupgrade$cachedNode;
+        if (node == null) {
+            node = mekceuaeupgrade$getAEUpgradeDelegate().getNode();
+            mekceuaeupgrade$cachedNode = node;
         }
-        return mekceuaeupgrade$aeUpgrade;
+        return node;
+    }
+
+    @Override
+    public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
+        AEUpgradeHostDelegate delegate = mekceuaeupgrade$aeUpgrade;
+        if (delegate == null) {
+            synchronized (this) {
+                delegate = mekceuaeupgrade$aeUpgrade;
+                if (delegate == null) {
+                    delegate = new AEUpgradeHostDelegate(this);
+                    mekceuaeupgrade$aeUpgrade = delegate;
+                }
+            }
+        }
+        return delegate;
     }
 
     @Override

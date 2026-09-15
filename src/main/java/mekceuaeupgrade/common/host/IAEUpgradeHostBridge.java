@@ -50,4 +50,8 @@ public interface IAEUpgradeHostBridge extends IAEUpgradeHost {
     default void mekceuaeupgrade$onAERecipePortsChanged() {
         mekceuaeupgrade$getAEUpgradeDelegate().onRecipePortsChanged();
     }
+
+    default void mekceuaeupgrade$invalidateAEBusyCache() {
+        mekceuaeupgrade$getAEUpgradeDelegate().invalidateBusyCache("container_contents");
+    }
 }

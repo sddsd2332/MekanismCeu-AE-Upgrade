@@ -49,12 +49,8 @@ public final class AEUpgradeInputInjector {
                   AEUpgradeDebug.stacks(inputs), AEUpgradeDebug.inputStacks(recipe));
             return false;
         }
-        if (!host.canAcceptAEItemInputs(recipe, inputs)) {
-            AEUpgradeDebug.log(host, "push rejected: machine cannot accept {}", AEUpgradeDebug.stacks(inputs));
-            return false;
-        }
-        if (!host.acceptAEItemInputs(recipe, inputs)) {
-            AEUpgradeDebug.log(host, "push rejected: machine rejected {} during execute", AEUpgradeDebug.stacks(inputs));
+        if (host.isAEAdmissionBlocked() || !host.tryAcceptAEItemInputs(recipe, inputs)) {
+            AEUpgradeDebug.log(host, "push rejected: machine cannot commit {}", AEUpgradeDebug.stacks(inputs));
             return false;
         }
         return true;

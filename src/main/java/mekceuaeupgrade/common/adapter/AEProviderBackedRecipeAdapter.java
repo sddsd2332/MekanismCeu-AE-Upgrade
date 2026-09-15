@@ -41,6 +41,45 @@ import java.util.function.Supplier;
  * Prefers Mekanism's provider contract while keeping the machine-specific adapter as a compatibility fallback.
  */
 public final class AEProviderBackedRecipeAdapter {
+    private static final boolean BOUNDED_CAPACITY = hasBoundedCapacity();
+    private static final boolean ADMISSION_HINT = hasAdmissionHint();
+    private static final ClassValue<Boolean> DEFAULT_BUSY_METHOD = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return declaredByProviderHost(type, "canAcceptAnyAEItemInput");
+        }
+    };
+    private static final ClassValue<Boolean> DEFAULT_INPUT_METHODS = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return declaredByProviderHost(type, "canAcceptAEItemInputs", AEExposedRecipe.class, List.class) &&
+                  declaredByProviderHost(type, "acceptAEItemInputs", AEExposedRecipe.class, List.class) &&
+                  declaredByProviderHost(type, "canAcceptAEItemInput", AEExposedRecipe.class, ItemStack.class) &&
+                  declaredByProviderHost(type, "acceptAEItemInput", AEExposedRecipe.class, ItemStack.class);
+        }
+    };
+
+    private static boolean declaredByProviderHost(Class<?> type, String method, Class<?>... arguments) {
+        try {
+            return type.getMethod(method, arguments).getDeclaringClass() == IAERecipeMachineHost.class;
+        } catch (ReflectiveOperationException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    private static boolean hasAdmissionHint() {
+        try {
+            MachinePort.class.getMethod("mayHaveInputSpace");
+            return true;
+        } catch (ReflectiveOperationException | SecurityException unavailable) {
+            return false;
+        }
+    }
+
+    private static boolean hasBoundedCapacity() {
+        try {
+            MachinePort.class.getMethod("getAvailableCapacity", MachineResourceStack.class, long.class);
+            return true;
+        } catch (ReflectiveOperationException | SecurityException unavailable) { return false; }
+    }
 
     private AEProviderBackedRecipeAdapter() {
     }
@@ -98,15 +137,44 @@ public final class AEProviderBackedRecipeAdapter {
         if (context == null) {
             return fallback.get().canAcceptAnyItemInput(host);
         }
-        for (MachineRecipeRoute route : context.routes) {
-            if (configurationMatches(route, context.ports) && outputsHaveCapacity(route, context.ports)) {
-                MachineTransferPlan plan = inputPlan((TileEntity) host, route, context.ports);
-                if (plan != null && plan.canExecute()) {
+        for (BusyRoute route : context.busyRoutes) {
+            if (configurationMatches(route.configurations, context.ports) && outputsHaveCapacity(route.outputs, context.ports)) {
+                if (canExecuteInput((TileEntity) host, route.route, context.ports)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    /** No recipe iteration or resource materialization. False is only returned for definite admission failures. */
+    public static boolean canAttemptItemInput(IAERecipeMachineHost host,
+          Supplier<IAERecipeMachineAdapter> fallback) {
+        if (!DEFAULT_BUSY_METHOD.get(host.getClass())) return host.canAcceptAnyAEItemInput();
+        ProviderContext context = findContext(host, QIOAutomationMode.SCHEDULED);
+        if (context == null) return fallback.get().canAcceptAnyItemInput(host);
+        if (context.routes.isEmpty()) return false;
+        if (!ADMISSION_HINT) return true;
+        for (MachinePort input : context.admissionInputs) {
+            if (input.mayHaveInputSpace()) return true;
+        }
+        return false;
+    }
+
+    /** Prepare once for this call and execute inside the caller's machine transaction; never cache a mutable plan. */
+    public static boolean tryAcceptItemInputs(IAERecipeMachineHost host, AEExposedRecipe recipe,
+          List<ItemStack> stacks, Supplier<IAERecipeMachineAdapter> fallback) {
+        // Do not bypass extension hosts which override the established check/execute callbacks.
+        if (!DEFAULT_INPUT_METHODS.get(host.getClass())) {
+            return host.canAcceptAEItemInputs(recipe, stacks) && host.acceptAEItemInputs(recipe, stacks);
+        }
+        ProviderContext context = findContext(host, QIOAutomationMode.SCHEDULED);
+        if (context == null) {
+            IAERecipeMachineAdapter adapter = fallback.get();
+            return adapter.canAcceptItemInputs(host, recipe, stacks) && adapter.acceptItemInputs(host, recipe, stacks);
+        }
+        MachineTransferPlan plan = createExecutableInputPlan((TileEntity) host, context, recipe, stacks);
+        return plan != null && plan.execute();
     }
 
     public static void observeInputContainers(IAERecipeMachineHost host, Consumer<Object> observer,
@@ -118,6 +186,20 @@ public final class AEProviderBackedRecipeAdapter {
         }
         for (MachinePort port : context.portList) {
             if (!port.isConfiguration() && port.role().acceptsInput()) {
+                observeContainerMembers(port.container(), observer);
+            }
+        }
+    }
+
+    public static void observeOutputContainers(IAERecipeMachineHost host, Consumer<Object> observer,
+          Supplier<IAERecipeMachineAdapter> fallback) {
+        ProviderContext context = findContext(host, QIOAutomationMode.OUTPUT_ONLY);
+        if (context == null) {
+            fallback.get().observeOutputContainers(host, observer);
+            return;
+        }
+        for (MachinePort port : context.portList) {
+            if (!port.isConfiguration() && port.role().allowsOutput()) {
                 observeContainerMembers(port.container(), observer);
             }
         }
@@ -184,7 +266,8 @@ public final class AEProviderBackedRecipeAdapter {
         if (candidates == null) {
             return null;
         }
-        for (MachineRecipeRoute candidate : candidates) {
+        for (int i = 0, size = candidates.size(); i < size; i++) {
+            MachineRecipeRoute candidate = candidates.get(i);
             if (!configurationMatches(candidate, context.ports)) {
                 continue;
             }
@@ -207,7 +290,9 @@ public final class AEProviderBackedRecipeAdapter {
             return null;
         }
         MachineTransferPlan plan = MachineTransferPlan.create(tile);
-        for (MachineResourceStack input : route.inputs()) {
+        List<MachineResourceStack> inputs = route.inputs();
+        for (int i = 0, size = inputs.size(); i < size; i++) {
+            MachineResourceStack input = inputs.get(i);
             MachinePort port = ports.get(input.portId());
             if (port == null || port.isConfiguration() || !port.role().acceptsInput() || port.kind() != input.kind()) {
                 return null;
@@ -217,8 +302,30 @@ public final class AEProviderBackedRecipeAdapter {
         return plan;
     }
 
+    /**
+     * The busy query only needs to answer whether insertion is possible. A one-input route cannot have duplicate
+     * containers, so constructing a transfer plan and entering its transaction wrapper adds no safety. Multi-input
+     * routes retain the full plan validation because they need the duplicate-container and atomicity checks.
+     */
+    private static boolean canExecuteInput(@Nullable TileEntity tile, MachineRecipeRoute route,
+          Map<String, MachinePort> ports) {
+        if (tile == null || route.inputs().isEmpty()) {
+            return false;
+        }
+        if (route.inputs().size() != 1) {
+            MachineTransferPlan plan = inputPlan(tile, route, ports);
+            return plan != null && plan.canExecute();
+        }
+        MachineResourceStack input = route.inputs().get(0);
+        MachinePort port = ports.get(input.portId());
+        return port != null && !port.isConfiguration() && port.role().acceptsInput() && port.kind() == input.kind() &&
+              port.canInsert(input);
+    }
+
     private static boolean configurationMatches(MachineRecipeRoute route, Map<String, MachinePort> ports) {
-        for (MachineResourceStack configuration : route.configurationInputs()) {
+        List<MachineResourceStack> configurations = route.configurationInputs();
+        for (int i = 0, size = configurations.size(); i < size; i++) {
+            MachineResourceStack configuration = configurations.get(i);
             MachinePort port = ports.get(configuration.portId());
             if (port == null || !port.isConfiguration() || port.kind() != configuration.kind()) {
                 return false;
@@ -231,14 +338,36 @@ public final class AEProviderBackedRecipeAdapter {
         return true;
     }
 
+    private static boolean configurationMatches(MachineResourceStack[] configurations, Map<String, MachinePort> ports) {
+        for (MachineResourceStack configuration : configurations) {
+            MachinePort port = ports.get(configuration.portId());
+            if (port == null || !port.isConfiguration() || port.kind() != configuration.kind()) return false;
+            MachineResourceStack current = port.peek();
+            if (current == null || !current.sameResource(configuration)) return false;
+        }
+        return true;
+    }
+
     private static boolean outputsHaveCapacity(MachineRecipeRoute route, Map<String, MachinePort> ports) {
+        return outputsHaveCapacity(compileOutputRequirements(route), ports);
+    }
+
+    private static OutputRequirement[] compileOutputRequirements(MachineRecipeRoute route) {
         Map<String, List<MachineResourceStack>> requiredByPort = new LinkedHashMap<>();
         addOutputs(requiredByPort, route.guaranteedOutputs());
         addOutputs(requiredByPort, route.optionalOutputs());
+        List<OutputRequirement> requirements = new ArrayList<>(requiredByPort.size());
         for (Map.Entry<String, List<MachineResourceStack>> entry : requiredByPort.entrySet()) {
-            MachinePort port = ports.get(entry.getKey());
+            requirements.add(new OutputRequirement(entry.getKey(), entry.getValue()));
+        }
+        return requirements.toArray(new OutputRequirement[0]);
+    }
+
+    private static boolean outputsHaveCapacity(OutputRequirement[] requirements, Map<String, MachinePort> ports) {
+        for (OutputRequirement requirement : requirements) {
+            MachinePort port = ports.get(requirement.portId);
             if (port == null || port.isConfiguration() || !port.role().allowsOutput() ||
-                !portHasOutputCapacity(port, entry.getValue())) {
+                !portHasOutputCapacity(port, requirement)) {
                 return false;
             }
         }
@@ -252,35 +381,42 @@ public final class AEProviderBackedRecipeAdapter {
         }
     }
 
-    private static boolean portHasOutputCapacity(MachinePort port, List<MachineResourceStack> outputs) {
-        if (outputs.isEmpty()) {
-            return true;
-        }
-        MachineResourceStack combined = outputs.get(0);
-        if (port.kind() != combined.kind()) {
-            return false;
-        }
-        boolean oneResource = true;
-        long amount = combined.amount();
-        for (int index = 1; index < outputs.size(); index++) {
-            MachineResourceStack output = outputs.get(index);
-            if (port.kind() != output.kind()) {
-                return false;
-            }
-            if (!combined.sameResource(output)) {
-                oneResource = false;
-            } else if (Long.MAX_VALUE - amount < output.amount()) {
-                return false;
-            } else {
-                amount += output.amount();
-            }
-        }
-        if (oneResource) {
-            MachineResourceStack required = combined.withAmount(amount);
-            return port.getAvailableCapacity(required) >= required.amount();
+    private static boolean portHasOutputCapacity(MachinePort port, OutputRequirement requirement) {
+        if (!requirement.valid) return false;
+        MachineResourceStack required = requirement.combined;
+        if (required != null) {
+            if (port.kind() != required.kind()) return false;
+            long capacity = BOUNDED_CAPACITY ? port.getAvailableCapacity(required, required.amount()) : port.getAvailableCapacity(required);
+            return capacity >= required.amount();
         }
         return port.kind() == mekanism.api.processing.MachineResourceKind.ITEM &&
-              groupedItemOutputsHaveCapacity(port, outputs);
+              groupedItemOutputsHaveCapacity(port, requirement.outputs);
+    }
+
+    private static final class OutputRequirement {
+        private final String portId;
+        private final List<MachineResourceStack> outputs;
+        @Nullable
+        private final MachineResourceStack combined;
+        private final boolean valid;
+
+        private OutputRequirement(String portId, List<MachineResourceStack> outputs) {
+            this.portId = portId;
+            this.outputs = Collections.unmodifiableList(new ArrayList<>(outputs));
+            MachineResourceStack first = outputs.get(0);
+            long amount = first.amount();
+            boolean sameResource = true;
+            boolean valid = true;
+            for (int i = 1; i < outputs.size(); i++) {
+                MachineResourceStack output = outputs.get(i);
+                if (first.kind() != output.kind()) { valid = false; break; }
+                if (!first.sameResource(output)) sameResource = false;
+                else if (Long.MAX_VALUE - amount < output.amount()) { valid = false; break; }
+                else amount += output.amount();
+            }
+            this.valid = valid;
+            combined = valid && sameResource ? first.withAmount(amount) : null;
+        }
     }
 
     private static boolean groupedItemOutputsHaveCapacity(MachinePort port,
@@ -553,12 +689,16 @@ public final class AEProviderBackedRecipeAdapter {
         private final Map<LogicalRouteKey, List<MachineRecipeRoute>> routesByLogicalKey;
         private final List<MachinePort> portList;
         private final Map<String, MachinePort> ports;
+        private final BusyRoute[] busyRoutes;
+        private final MachinePort[] admissionInputs;
 
         private ProviderContext(@Nullable ProviderContextIdentity identity, List<MachineRecipeRoute> routes,
               List<MachinePort> portList,
               Map<String, MachinePort> ports) {
             this.identity = identity;
             this.routes = routes == null ? Collections.emptyList() : routes;
+            busyRoutes = new BusyRoute[this.routes.size()];
+            for (int i = 0; i < busyRoutes.length; i++) busyRoutes[i] = new BusyRoute(this.routes.get(i));
             Map<LogicalRouteKey, List<MachineRecipeRoute>> indexedRoutes = new LinkedHashMap<>();
             for (MachineRecipeRoute route : this.routes) {
                 LogicalRouteKey logicalKey = LogicalRouteKey.create(route, ports);
@@ -572,6 +712,25 @@ public final class AEProviderBackedRecipeAdapter {
             routesByLogicalKey = Collections.unmodifiableMap(immutableRoutes);
             this.portList = portList == null ? Collections.emptyList() : portList;
             this.ports = ports;
+            List<MachinePort> inputs = new ArrayList<>();
+            for (MachinePort port : this.portList) {
+                if (!port.isConfiguration() && port.role().acceptsInput()) inputs.add(port);
+            }
+            admissionInputs = inputs.toArray(new MachinePort[0]);
+        }
+
+    }
+
+    /** Private arrays contain only immutable recipe metadata and expire with the provider context. */
+    private static final class BusyRoute {
+        private final MachineRecipeRoute route;
+        private final MachineResourceStack[] configurations;
+        private final OutputRequirement[] outputs;
+
+        private BusyRoute(MachineRecipeRoute route) {
+            this.route = route;
+            configurations = route.configurationInputs().toArray(new MachineResourceStack[0]);
+            outputs = compileOutputRequirements(route);
         }
     }
 
@@ -687,14 +846,8 @@ public final class AEProviderBackedRecipeAdapter {
                 int existing = stored.isEmpty() ? 0 : stored.getCount();
                 int room = Math.max(0, slot.getLimit(resource) - existing);
                 offered.setCount(room);
-                ItemStack remainder = room == 0 ? offered :
-                      slot.insertItem(offered, Action.SIMULATE, AutomationType.INTERNAL);
-                if (remainder == null || !remainder.isEmpty() &&
-                    (!ItemHandlerHelper.canItemStacksStack(offered, remainder) || remainder.getCount() > offered.getCount())) {
-                    return 0;
-                }
-                int rejected = remainder.isEmpty() ? 0 : remainder.getCount();
-                capacity = Math.max(0, room - rejected);
+                int accepted = room == 0 ? 0 : slot.insertItemCount(offered, Action.SIMULATE, AutomationType.INTERNAL);
+                capacity = Math.max(0, accepted);
                 if (capacity == 0) {
                     capacity = -1;
                     return 0;

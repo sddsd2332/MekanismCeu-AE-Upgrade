@@ -59,7 +59,9 @@ import net.minecraftforge.fluids.FluidStack;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class AEUpgradeNode {
 
@@ -104,10 +106,30 @@ public class AEUpgradeNode {
     private static final int PENDING_TRANSFER_RETRY_MAX_TICKS = 40;
     private static final int OUTPUT_DRAIN_RETRY_INITIAL_TICKS = 5;
     private static final int OUTPUT_DRAIN_MAX_INTERVAL_TICKS = 40;
+    private static final ClassValue<Boolean> CUSTOM_NETWORK_CHECK = new ClassValue<Boolean>() {
+        @Override
+        protected Boolean computeValue(Class<?> type) {
+            try {
+                return type.getDeclaredMethod("canUseNetwork").getDeclaringClass() != AEUpgradeNode.class;
+            } catch (NoSuchMethodException ignored) {
+                return type.getSuperclass() != null && get(type.getSuperclass());
+            }
+        }
+    };
     public static final int MIN_GLOBAL_PROFILE_SLOT = 1;
     public static final int MAX_GLOBAL_PROFILE_SLOT = 10;
 
     private final IAEUpgradeHost host;
+    private final AEUpgradeStateCache upgradeStateCache;
+    private final boolean legacyExposureCheck;
+    private final boolean customNetworkCheck;
+    /**
+     * Bound once so the hot path costs one virtual call instead of a type test plus an interface
+     * dispatch. The host hierarchy spans many machine classes and interfaces, so
+     * {@code host instanceof IAEItemRecipeHost} resolves megamorphically and dominated the cost of
+     * every busy query. The bound target still reads live state, so the gate stays live.
+     */
+    private final BooleanSupplier admissionBlockedCheck;
     private final AEProviderBackedRecipeAdapter.ContextCache providerContextCache =
           new AEProviderBackedRecipeAdapter.ContextCache();
     private final Object machineAccessMonitor;
@@ -159,11 +181,14 @@ public class AEUpgradeNode {
     private long nextAutoProcessingTick = Long.MIN_VALUE;
     private int autoProcessingRetryInterval = AUTO_PROCESSING_RETRY_INITIAL_TICKS;
     private volatile boolean autoProcessingRequested = true;
-    private final IContentsListener outputContentsListener = this::requestOutputDrain;
-    private final IContentsListener inputContentsListener = this::requestAutoProcessing;
+    private final IContentsListener outputContentsListener = this::requestOutputContainerChange;
+    private final IContentsListener inputContentsListener = this::requestInputContainerChange;
     private final Map<IContentsListenerRegistry, Boolean> observedOutputContainers = new IdentityHashMap<>();
     private final Map<IContentsListenerRegistry, Boolean> observedInputContainers = new IdentityHashMap<>();
     private long lastBusyDebugTick = Long.MIN_VALUE;
+    private final AtomicLong busyCacheGeneration = new AtomicLong();
+    private volatile long busyCacheReadGeneration = Long.MIN_VALUE;
+    private volatile boolean busyCacheValue;
     @Nullable
     private Object lastRecipeSourceKey;
     private int lastRecipeVersion = Integer.MIN_VALUE;
@@ -201,20 +226,30 @@ public class AEUpgradeNode {
     private IGridNode resolvedWirelessNode;
     private long nextWirelessTargetRefreshTick = Long.MIN_VALUE;
     private ExposureMode exposureMode = ExposureMode.NONE;
-    private boolean exposureModeValid;
+    private int exposureModeMask = Integer.MIN_VALUE;
     @Nullable
     private static IItemStorageChannel itemStorageChannel;
 
     public AEUpgradeNode(IAEUpgradeHost host, Object machineAccessMonitor) {
+        this(host, machineAccessMonitor, new ItemStack(MEKCeuAEUpgradeItems.AECraftingUpgrade));
+    }
+
+    AEUpgradeNode(IAEUpgradeHost host, Object machineAccessMonitor, ItemStack visualRepresentation) {
         this.host = host;
+        upgradeStateCache = new AEUpgradeStateCache(host);
+        legacyExposureCheck = upgradeStateCache.requiresLegacyExposureCheck();
+        customNetworkCheck = CUSTOM_NETWORK_CHECK.get(getClass());
+        admissionBlockedCheck = host instanceof IAEItemRecipeHost itemHost
+              ? itemHost::isAEAdmissionBlocked
+              : () -> false;
         this.machineAccessMonitor = Objects.requireNonNull(machineAccessMonitor);
-        proxy = new AENetworkProxy(host, "aeUpgrade", new ItemStack(MEKCeuAEUpgradeItems.AECraftingUpgrade), true);
+        proxy = new AENetworkProxy(host, "aeUpgrade", visualRepresentation, true);
         proxy.setFlags(GridFlags.REQUIRE_CHANNEL);
         proxy.setIdlePowerUsage(0.0);
         proxy.setValidSides(EnumSet.noneOf(EnumFacing.class));
         recipeCache = new AEUpgradeRecipeCache(host);
         source = new MachineSource(host);
-        pendingTransfers = new AEPendingTransferBuffer(this::markHostDirty);
+        pendingTransfers = new AEPendingTransferBuffer(this::onPendingTransferChanged);
         autoProcessingTickOffset = Math.floorMod(System.identityHashCode(host), AUTO_PROCESSING_INTERVAL_TICKS);
     }
 
@@ -608,6 +643,7 @@ public class AEUpgradeNode {
     }
 
     public void invalidate() {
+        invalidateBusyCache("lifecycle");
         clearObservedContainers();
         providerContextCache.clear();
         AERecipeProfileManager.unregisterHost(host);
@@ -627,6 +663,7 @@ public class AEUpgradeNode {
     }
 
     public void onChunkUnload() {
+        invalidateBusyCache("chunk_unload");
         clearObservedContainers();
         providerContextCache.clear();
         AERecipeProfileManager.unregisterHost(host);
@@ -668,6 +705,9 @@ public class AEUpgradeNode {
             connectionChanged = refreshConnectionIfNeeded();
         }
         boolean networkUsable = canUseNetwork();
+        if (networkUsable != lastNetworkUsable) {
+            invalidateBusyCache("network");
+        }
         if (!networkUsable) {
             unregisterIncrementalCraftingProvider();
         }
@@ -736,6 +776,7 @@ public class AEUpgradeNode {
     }
 
     public void deactivate() {
+        invalidateBusyCache("lifecycle");
         clearObservedContainers();
         AERecipeProfileManager.unregisterHost(host);
         unregisterWirelessCraftingProvider();
@@ -773,6 +814,7 @@ public class AEUpgradeNode {
     }
 
     public void onGridChanged() {
+        invalidateBusyCache("grid");
         invalidateNetworkCache();
         resetOutputDrainSchedule();
         resetAutoProcessingSchedule();
@@ -781,6 +823,7 @@ public class AEUpgradeNode {
     }
 
     public void onUpgradeConfigurationChanged() {
+        invalidateBusyCache("upgrade");
         clearObservedContainers();
         unregisterIncrementalCraftingProvider();
         invalidateExposureModeCache();
@@ -811,13 +854,37 @@ public class AEUpgradeNode {
     }
 
     public boolean isBusy() {
+        // Preserve custom host gates; the normal host path uses the versioned installed-state cache.
+        if (legacyExposureCheck) {
+            if (!host.shouldExposeAECrafting()) return true;
+        }
         if (!isCraftingMode(getExposureMode())) {
             debugBusy("busy: AE upgrade is not installed or host is not exposing AE");
             return true;
         }
-        if (!canUseNetwork()) {
-            debugBusy("busy: network unavailable node={} active={} powered={} side={}",
-                  proxy.getNode() != null, proxy.isActive(), proxy.isPowered(), connectionSide);
+        // Host gates that do not participate in invalidation must be read on every query, hit or
+        // miss: the generation can be unchanged while a custom host flips its own admission state.
+        if (admissionBlockedCheck.getAsBoolean()) return true;
+        // Extension nodes may override the network probe and can have state which is not
+        // represented by this node's invalidation callbacks. Keep that contract live.
+        if (customNetworkCheck) {
+            if (!canUseNetwork()) {
+                return true;
+            }
+        }
+        long generation = busyCacheGeneration.get();
+        if (busyCacheReadGeneration == generation) {
+            return busyCacheValue;
+        }
+        return recomputeBusy(generation);
+    }
+
+    private boolean recomputeBusy(long generation) {
+        if (!customNetworkCheck && !canUseNetwork()) {
+            if (AEUpgradeDebug.enabled()) {
+                debugBusy("busy: network unavailable node={} active={} powered={} side={}",
+                      proxy.getNode() != null, proxy.isActive(), proxy.isPowered(), connectionSide);
+            }
             return true;
         }
         if (pendingTransfers.hasOwnedResources()) {
@@ -825,15 +892,33 @@ public class AEUpgradeNode {
             return true;
         }
         if (host instanceof IAEItemRecipeHost itemHost) {
-            return callMachineContainerTransaction(() -> {
-                if (itemHost.canAcceptAnyAEItemInput()) {
+            boolean busy = callMachineContainerTransaction(() -> {
+                itemHost.observeAEInputContainers(this::observeInputContainer);
+                itemHost.observeAEOutputContainers(this::observeOutputContainer);
+                if (itemHost.canAttemptAEItemInput()) {
                     return false;
                 }
-                debugBusy("busy: machine cannot currently accept any AE item input");
+                debugBusy("busy: machine admission is blocked");
                 return true;
             });
+            // Only cache when output capacity is observable. Legacy adapters without output
+            // listeners must retain the live check so silent capacity changes remain visible.
+            if (generation == busyCacheGeneration.get() && !observedOutputContainers.isEmpty()) {
+                busyCacheValue = busy;
+                busyCacheReadGeneration = generation;
+            }
+            return busy;
         }
         return false;
+    }
+
+    public void invalidateBusyCache() {
+        invalidateBusyCache("unspecified");
+    }
+
+    public void invalidateBusyCache(String reason) {
+        busyCacheGeneration.incrementAndGet();
+        busyCacheReadGeneration = Long.MIN_VALUE;
     }
 
     public void provideCrafting(ICraftingProviderHelper craftingTracker) {
@@ -894,6 +979,9 @@ public class AEUpgradeNode {
         }
         if (!(host instanceof IAEItemRecipeHost itemHost)) {
             AEUpgradeDebug.log(host, "pushPattern rejected: host does not implement item recipe host");
+            return false;
+        }
+        if (itemHost.isAEAdmissionBlocked()) {
             return false;
         }
         AEExposedRecipe recipe = recipeCache.find(exposed -> exposed.matches(patternDetails));
@@ -1013,6 +1101,11 @@ public class AEUpgradeNode {
         autoProcessingRequested = true;
     }
 
+    private void requestOutputContainerChange() {
+        requestOutputDrain();
+        invalidateBusyCache("output_contents");
+    }
+
     /** 标记当前排空遇到仍有内容但 AE 暂时无法完整接收的端口。 */
     public void markOutputBlocked() {
         outputBlocked = true;
@@ -1026,6 +1119,11 @@ public class AEUpgradeNode {
 
     private void requestAutoProcessing() {
         autoProcessingRequested = true;
+    }
+
+    private void requestInputContainerChange() {
+        requestAutoProcessing();
+        invalidateBusyCache("input_contents");
     }
 
     /**
@@ -1191,6 +1289,7 @@ public class AEUpgradeNode {
     }
 
     public void invalidateRecipeCache() {
+        invalidateBusyCache("recipe");
         providerContextCache.clear();
         recipeCache.invalidate();
         nextRecipeSourceRefreshTick = Long.MIN_VALUE;
@@ -1229,6 +1328,7 @@ public class AEUpgradeNode {
         if (!recipeVersionChanged && !recipeSourceChanged) {
             return false;
         }
+        invalidateBusyCache("recipe");
         lastRecipeVersion = currentRecipeVersion;
         providerContextCache.clear();
         recipeCache.invalidate();
@@ -1362,31 +1462,32 @@ public class AEUpgradeNode {
         if (!isHostAvailable()) {
             return ExposureMode.NONE;
         }
-        if (exposureModeValid) {
-            return exposureMode;
-        }
-        exposureMode = resolveExposureMode();
-        exposureModeValid = true;
+        int modes = upgradeStateCache.supportedModes();
+        if (exposureModeMask == modes) return exposureMode;
+        ExposureMode resolved = resolveExposureMode(modes);
+        if (resolved != exposureMode) invalidateBusyCache("exposure");
+        exposureMode = resolved;
+        exposureModeMask = modes;
         return exposureMode;
     }
 
-    private ExposureMode resolveExposureMode() {
-        if (host.supportsAEWiredCraftingUpgrade() && host.hasAEWiredCraftingUpgrade()) {
+    private ExposureMode resolveExposureMode(int modes) {
+        if ((modes & AEUpgradeStateCache.WIRED_CRAFTING) != 0) {
             return ExposureMode.WIRED_CRAFTING;
         }
-        if (host.supportsAEWirelessCraftingUpgrade() && host.hasAEWirelessCraftingUpgrade()) {
+        if ((modes & AEUpgradeStateCache.WIRELESS_CRAFTING) != 0) {
             return ExposureMode.WIRELESS_CRAFTING;
         }
-        if (host.supportsAEWiredAutoProcessingUpgrade() && host.hasAEWiredAutoProcessingUpgrade()) {
+        if ((modes & AEUpgradeStateCache.WIRED_AUTO_PROCESSING) != 0) {
             return ExposureMode.WIRED_AUTO_PROCESSING;
         }
-        if (host.supportsAEWirelessAutoProcessingUpgrade() && host.hasAEWirelessAutoProcessingUpgrade()) {
+        if ((modes & AEUpgradeStateCache.WIRELESS_AUTO_PROCESSING) != 0) {
             return ExposureMode.WIRELESS_AUTO_PROCESSING;
         }
-        if (host.supportsAEWiredOutputUpgrade() && host.hasAEWiredOutputUpgrade()) {
+        if ((modes & AEUpgradeStateCache.WIRED_OUTPUT) != 0) {
             return ExposureMode.WIRED_OUTPUT;
         }
-        if (host.supportsAEWirelessOutputUpgrade() && host.hasAEWirelessOutputUpgrade()) {
+        if ((modes & AEUpgradeStateCache.WIRELESS_OUTPUT) != 0) {
             return ExposureMode.WIRELESS_OUTPUT;
         }
         return ExposureMode.NONE;
@@ -1398,7 +1499,8 @@ public class AEUpgradeNode {
 
     private void invalidateExposureModeCache() {
         exposureMode = ExposureMode.NONE;
-        exposureModeValid = false;
+        exposureModeMask = Integer.MIN_VALUE;
+        upgradeStateCache.invalidate();
     }
 
     private static boolean isCraftingMode(ExposureMode mode) {
@@ -1830,6 +1932,11 @@ public class AEUpgradeNode {
         if (host instanceof TileEntity tile) {
             tile.markDirty();
         }
+    }
+
+    private void onPendingTransferChanged() {
+        markHostDirty();
+        invalidateBusyCache("pending_transfer");
     }
 
     private void debugBusy(String message, Object... args) {

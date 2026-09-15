@@ -69,4 +69,12 @@ public final class AEUpgradeHostDelegate {
     public void onRecipePortsChanged() {
         node.onRecipePortsChanged();
     }
+
+    public void invalidateBusyCache() {
+        node.invalidateBusyCache();
+    }
+
+    public void invalidateBusyCache(String reason) {
+        node.invalidateBusyCache(reason);
+    }
 }

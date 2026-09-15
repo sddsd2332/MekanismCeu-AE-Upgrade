@@ -48,6 +48,9 @@ public interface IAERecipeMachineAdapter {
     default void observeInputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
     }
 
+    default void observeOutputContainers(IAEItemRecipeHost host, Consumer<Object> observer) {
+    }
+
     default boolean drainItemOutputs(IAEItemRecipeHost host, AEUpgradeNode node) {
         return false;
     }

@@ -9,6 +9,7 @@ import mekceuaeupgrade.common.adapter.AEFarmRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
 import mekceuaeupgrade.common.host.AEUpgradeHostDelegate;
+import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekceuaeupgrade.common.host.IAEUpgradeHostBridge;
 import mekceumoremachine.common.inventory.slot.FarmOutputInventorySlot;
@@ -42,7 +43,10 @@ public abstract class MixinTileEntityTierOrganicFarm implements IAERecipeMachine
     @Shadow
     public MergedTank mergedTank;
     @Unique
-    private AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+    private volatile AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+
+    @Unique
+    private volatile AEUpgradeNode mekceuaeupgrade$cachedNode;
     @Unique
     private IAERecipeMachineAdapter mekceuaeupgrade$aeRecipeAdapter;
 
@@ -53,11 +57,28 @@ public abstract class MixinTileEntityTierOrganicFarm implements IAERecipeMachine
     public abstract int getRecipeGasUsagePerOperation();
 
     @Override
-    public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
-        if (mekceuaeupgrade$aeUpgrade == null) {
-            mekceuaeupgrade$aeUpgrade = new AEUpgradeHostDelegate(this);
+    public AEUpgradeNode getAEUpgradeNode() {
+        AEUpgradeNode node = mekceuaeupgrade$cachedNode;
+        if (node == null) {
+            node = mekceuaeupgrade$getAEUpgradeDelegate().getNode();
+            mekceuaeupgrade$cachedNode = node;
         }
-        return mekceuaeupgrade$aeUpgrade;
+        return node;
+    }
+
+    @Override
+    public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
+        AEUpgradeHostDelegate delegate = mekceuaeupgrade$aeUpgrade;
+        if (delegate == null) {
+            synchronized (this) {
+                delegate = mekceuaeupgrade$aeUpgrade;
+                if (delegate == null) {
+                    delegate = new AEUpgradeHostDelegate(this);
+                    mekceuaeupgrade$aeUpgrade = delegate;
+                }
+            }
+        }
+        return delegate;
     }
 
     @Override

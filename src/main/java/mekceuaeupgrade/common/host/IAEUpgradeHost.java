@@ -201,7 +201,7 @@ public interface IAEUpgradeHost extends IGridProxyable, IActionHost, ICraftingPr
 
     @Override
     default boolean isBusy() {
-        return shouldExposeAECrafting() ? getAEUpgradeNode().isBusy() : true;
+        return getAEUpgradeNode().isBusy();
     }
 
     @Override

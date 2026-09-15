@@ -18,14 +18,34 @@ public abstract class MixinTileEntityAmbientAccumulatorEnergy implements IAEOutp
     public BasicGasTank outputTank;
 
     @Unique
-    private AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+    private volatile AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
+
+    @Unique
+    private volatile AEUpgradeNode mekceuaeupgrade$cachedNode;
+
+    @Override
+    public AEUpgradeNode getAEUpgradeNode() {
+        AEUpgradeNode node = mekceuaeupgrade$cachedNode;
+        if (node == null) {
+            node = mekceuaeupgrade$getAEUpgradeDelegate().getNode();
+            mekceuaeupgrade$cachedNode = node;
+        }
+        return node;
+    }
 
     @Override
     public AEUpgradeHostDelegate mekceuaeupgrade$getAEUpgradeDelegate() {
-        if (mekceuaeupgrade$aeUpgrade == null) {
-            mekceuaeupgrade$aeUpgrade = new AEUpgradeHostDelegate(this);
+        AEUpgradeHostDelegate delegate = mekceuaeupgrade$aeUpgrade;
+        if (delegate == null) {
+            synchronized (this) {
+                delegate = mekceuaeupgrade$aeUpgrade;
+                if (delegate == null) {
+                    delegate = new AEUpgradeHostDelegate(this);
+                    mekceuaeupgrade$aeUpgrade = delegate;
+                }
+            }
         }
-        return mekceuaeupgrade$aeUpgrade;
+        return delegate;
     }
 
     @Override

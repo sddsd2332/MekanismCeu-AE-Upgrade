@@ -40,12 +40,30 @@ public interface IAEItemRecipeHost extends IAEUpgradeHost {
 
     boolean canAcceptAnyAEItemInput();
 
+    /** Cheap machine-specific gate, read live even when the shared admission result is cached. */
+    default boolean isAEAdmissionBlocked() {
+        return false;
+    }
+
+    /** Unknown adapters retain their original admission contract. Provider hosts can use structural hints. */
+    default boolean canAttemptAEItemInput() {
+        return canAcceptAnyAEItemInput();
+    }
+
+    /** One dispatch operation. Legacy hosts keep both their validation and insertion callbacks. */
+    default boolean tryAcceptAEItemInputs(AEExposedRecipe recipe, List<ItemStack> stacks) {
+        return canAcceptAEItemInputs(recipe, stacks) && acceptAEItemInputs(recipe, stacks);
+    }
+
     /**
      * 枚举自动处理使用的输入槽位和储罐。
      *
      * @param observer 接收输入容器的观察器
      */
     default void observeAEInputContainers(Consumer<Object> observer) {
+    }
+
+    default void observeAEOutputContainers(Consumer<Object> observer) {
     }
 
     boolean drainAEItemOutputs(AEUpgradeNode node);
