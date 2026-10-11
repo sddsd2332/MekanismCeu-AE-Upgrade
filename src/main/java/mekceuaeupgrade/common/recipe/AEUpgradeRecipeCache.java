@@ -31,6 +31,8 @@ public class AEUpgradeRecipeCache {
     private static Comparator<AEExposedRecipe> priorityComparator;
 
     private final IAEUpgradeHost host;
+    private final AERecipeProfileManager.ProfileLookup craftingProfileLookup = new AERecipeProfileManager.ProfileLookup();
+    private final AERecipeProfileManager.ProfileLookup autoProfileLookup = new AERecipeProfileManager.ProfileLookup();
     private final List<AEExposedRecipe> recipes = new ArrayList<>();
     private final List<AEExposedRecipe> autoProcessingRecipes = new ArrayList<>();
     private List<AEExposedRecipe> recipeView = Collections.unmodifiableList(recipes);
@@ -58,6 +60,12 @@ public class AEUpgradeRecipeCache {
         return autoProcessingRecipeView;
     }
 
+    public boolean isAutoProcessingViewCurrent(List<AEExposedRecipe> expectedView) {
+        return expectedView == autoProcessingRecipeView && autoProcessingRecipeVersion == RecipeHandler.getGlobalRecipeVersion() &&
+              lastAutoProcessingProfile != null && autoProcessingProfileVersion == lastAutoProcessingProfile.getVersion() &&
+              autoProfileLookup.isCurrent(host, AERecipeConfigType.AUTO_PROCESSING);
+    }
+
     public AEExposedRecipe find(ICraftingPatternDetailsAccessor accessor) {
         rebuildIfNeeded();
         for (AEExposedRecipe recipe : recipes) {
@@ -69,6 +77,8 @@ public class AEUpgradeRecipeCache {
     }
 
     public void invalidate() {
+        craftingProfileLookup.clear();
+        autoProfileLookup.clear();
         craftingRecipeVersion = -1;
         autoProcessingRecipeVersion = -1;
     }
@@ -80,7 +90,7 @@ public class AEUpgradeRecipeCache {
 
     private void rebuildIfNeeded() {
         int currentVersion = RecipeHandler.getGlobalRecipeVersion();
-        AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.CRAFTING);
+        AERecipeProfile profile = craftingProfileLookup.get(host, AERecipeConfigType.CRAFTING);
         int currentProfileVersion = profile == null ? -1 : profile.getVersion();
         if (craftingRecipeVersion == currentVersion && profileVersion == currentProfileVersion && profile == lastProfile) {
             return;
@@ -96,7 +106,7 @@ public class AEUpgradeRecipeCache {
 
     private void rebuildAutoProcessingIfNeeded() {
         int currentVersion = RecipeHandler.getGlobalRecipeVersion();
-        AERecipeProfile profile = AERecipeProfileManager.getProfile(host, AERecipeConfigType.AUTO_PROCESSING);
+        AERecipeProfile profile = autoProfileLookup.get(host, AERecipeConfigType.AUTO_PROCESSING);
         int currentProfileVersion = profile == null ? -1 : profile.getVersion();
         if (autoProcessingRecipeVersion == currentVersion && autoProcessingProfileVersion == currentProfileVersion && profile == lastAutoProcessingProfile) {
             return;

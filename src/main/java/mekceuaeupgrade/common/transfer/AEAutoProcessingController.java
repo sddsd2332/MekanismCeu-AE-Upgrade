@@ -1,6 +1,8 @@
 package mekceuaeupgrade.common.transfer;
 
 import mekceuaeupgrade.common.host.AEUpgradeNode;
+import mekceuaeupgrade.common.adapter.AEProviderBackedRecipeAdapter;
+import mekceuaeupgrade.common.host.IAERecipeMachineHost;
 import mekanism.common.tile.factory.TileEntityFactory;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
@@ -13,8 +15,8 @@ import java.util.List;
  * AE 自动处理升级的配方驱动输入控制器。
  *
  * <p>控制器从已启用的暴露配方中选一条，按 route 类型从 AE 网络抽取物品、气体或流体，
- * 再复用机器 adapter 的旧物品输入入口把内容写入机器。这样 AE 合成和自动处理共享同一套
- * 配方匹配、端口写入和机器输出回收逻辑。</p>
+ * 默认 provider 机器仅补齐输入缺口；合成投料保留完整订单输入契约。
+ * 实际产物由共享输出模块独立回推，不在这里预留机器或 AE 的预计输出空间。</p>
  */
 public final class AEAutoProcessingController {
 
@@ -36,47 +38,68 @@ public final class AEAutoProcessingController {
         if (node == null || host == null || recipes == null || recipes.isEmpty() || !node.canUseNetwork()) {
             return false;
         }
-        for (AEExposedRecipe recipe : recipes) {
-            if (tryProcessRecipe(node, host, recipe)) {
-                return true;
+        return process(node, host, new AEAutoProcessingProgram(recipes));
+    }
+
+    public static boolean process(AEUpgradeNode node, IAEItemRecipeHost host, AEAutoProcessingProgram program) {
+        if (node == null || host == null || program == null || !node.canUseNetwork() || !program.enter()) return false;
+        try {
+            AEProviderBackedRecipeAdapter.ContextCache contexts = node.getProviderContextCache();
+            if (contexts != null) contexts.setAutoProcessingRecipes(program.recipes());
+            for (int i = 0; i < program.size(); i++) {
+                // A failed rollback must be recovered before another recipe can own resources.
+                if (node.getPendingTransferBuffer().hasOwnedResources()) return false;
+                if (tryProcessRecipe(node, host, program.entry(i))) return true;
             }
+            return false;
+        } finally {
+            program.exit();
         }
-        return false;
     }
 
     /**
      * 对单条配方执行“模拟抽取、模拟写入、真实抽取、真实写入”的原子流程。
      */
-    private static boolean tryProcessRecipe(AEUpgradeNode node, IAEItemRecipeHost host, AEExposedRecipe recipe) {
-        PreparedRecipe prepared = prepareRecipe(node, host, recipe);
-        if (prepared == null && host instanceof TileEntityFactory && recipe.getCraftAmount() > 1) {
-            prepared = findLargestFactoryBatch(node, host, recipe);
-        }
+    private static boolean tryProcessRecipe(AEUpgradeNode node, IAEItemRecipeHost host, AEAutoProcessingProgram.Entry entry) {
+        AEProviderBackedRecipeAdapter.AutoProcessingSearch search = host instanceof IAERecipeMachineHost providerHost ?
+              node.callMachineContainerTransaction(() ->
+                    AEProviderBackedRecipeAdapter.beginAutoProcessingSearch(providerHost, entry.recipe)) : null;
+        PreparedRecipe prepared = (host instanceof TileEntityFactory
+              || search != null || AEProviderBackedRecipeAdapter.supportsAutoProcessingRefill(host)) &&
+              entry.recipe.getCraftAmount() > 1 ?
+              findLargestFactoryBatch(node, host, entry, search) : prepareRecipe(node, host, entry, search);
         if (prepared == null) {
             return false;
         }
+        if (prepared.candidate != null) {
+            AEProviderBackedRecipeAdapter.AutoProcessingCandidate candidate = prepared.candidate;
+            AEProviderBackedRecipeAdapter.AutoProcessingInputs refill =
+                  node.callMachineContainerTransaction(candidate::capture);
+            if (refill == null) return false;
+            // The search's stock cache is never an extraction authority. Rebuild requests
+            // from the fresh quote and query AE again before taking any network resource.
+            AERecipeNetworkTransferPlan actual = AERecipeNetworkTransferPlan.fromInputs(refill.missingInputs());
+            if (actual == null || !actual.canExtract(node)) return false;
+            prepared = new PreparedRecipe(prepared.recipe, actual, actual.getLegacyInputs(), refill, null);
+        }
+        PreparedRecipe accepted = prepared;
         AEExposedRecipe acceptedRecipe = prepared.recipe;
         AERecipeNetworkTransferPlan inputPlan = prepared.inputPlan;
+        if (inputPlan.isEmpty()) return false; // Existing stock already covers this target.
         List<ItemStack> legacyInputs = prepared.legacyInputs;
         if (!inputPlan.extract(node)) {
             return false;
         }
-        if (!inputPlan.canAcceptOutputs(node)) {
-            inputPlan.rollback(node);
-            AEUpgradeDebug.log(host, "auto processing rolled back because AE cannot accept outputs={}",
-                  AEUpgradeDebug.outputStacks(acceptedRecipe));
-            return false;
-        }
         inputPlan.beginMachineDelivery();
-        boolean accepted;
+        boolean delivered;
         try {
-            accepted = node.callMachineContainerTransaction(() ->
-                  host.canAcceptAEItemInputs(acceptedRecipe, legacyInputs) && host.acceptAEItemInputs(acceptedRecipe, legacyInputs));
+            delivered = node.callMachineContainerTransaction(() -> accepted.refill != null
+                  ? accepted.refill.execute() : host.tryAcceptAEItemInputs(acceptedRecipe, legacyInputs));
         } catch (RuntimeException | LinkageError e) {
             inputPlan.rollback(node);
             throw e;
         }
-        if (!accepted) {
+        if (!delivered) {
             inputPlan.rollback(node);
             AEUpgradeDebug.log(host, "auto processing rolled back inputs={} outputs={}",
                   AEUpgradeDebug.inputStacks(acceptedRecipe), AEUpgradeDebug.outputStacks(acceptedRecipe));
@@ -88,8 +111,26 @@ public final class AEAutoProcessingController {
         return true;
     }
 
-    private static PreparedRecipe prepareRecipe(AEUpgradeNode node, IAEItemRecipeHost host, AEExposedRecipe recipe) {
-        AERecipeNetworkTransferPlan inputPlan = recipe.getAutoProcessingPlan();
+    private static PreparedRecipe prepareRecipe(AEUpgradeNode node, IAEItemRecipeHost host,
+          AEAutoProcessingProgram.Entry entry, AEProviderBackedRecipeAdapter.AutoProcessingSearch search) {
+        AEExposedRecipe recipe = entry.recipe;
+        if (search != null) {
+            AEProviderBackedRecipeAdapter.AutoProcessingCandidate candidate =
+                  node.callMachineContainerTransaction(() -> search.prepare(recipe.getCraftAmount()));
+            if (candidate == null) return null;
+            AERecipeNetworkTransferPlan plan = AERecipeNetworkTransferPlan.fromInputs(candidate.missingInputs());
+            if (plan == null || !plan.canExtract(node)) return null;
+            return new PreparedRecipe(recipe, plan, java.util.Collections.emptyList(), null, candidate);
+        }
+        if (AEProviderBackedRecipeAdapter.supportsAutoProcessingRefill(host)) {
+            AEProviderBackedRecipeAdapter.AutoProcessingInputs refill = node.callMachineContainerTransaction(() ->
+                  AEProviderBackedRecipeAdapter.prepareAutoProcessingInputs((IAERecipeMachineHost) host, recipe));
+            if (refill == null) return null;
+            AERecipeNetworkTransferPlan plan = AERecipeNetworkTransferPlan.fromInputs(refill.missingInputs());
+            if (plan == null || !plan.canExtract(node)) return null;
+            return new PreparedRecipe(recipe, plan, plan.getLegacyInputs(), refill, null);
+        }
+        AERecipeNetworkTransferPlan inputPlan = entry.plan;
         if (inputPlan == null || inputPlan.isEmpty()) {
             return null;
         }
@@ -100,31 +141,25 @@ public final class AEAutoProcessingController {
         if (!node.callMachineContainerTransaction(() -> host.canAcceptAEItemInputs(recipe, legacyInputs))) {
             return null;
         }
-        // 自引用路线可能通过抽取输入释放恰好足够的 AE 空间，因此延后到真实抽取后再检查。
-        if (!recipe.hasSelfReferentialOutput() && !inputPlan.canAcceptOutputs(node)) {
-            return null;
-        }
-        return new PreparedRecipe(recipe, inputPlan, legacyInputs);
+        return new PreparedRecipe(recipe, inputPlan, legacyInputs, null, null);
     }
 
-    private static PreparedRecipe findLargestFactoryBatch(AEUpgradeNode node, IAEItemRecipeHost host, AEExposedRecipe recipe) {
-        PreparedRecipe best = prepareRecipe(node, host, recipe.withCraftAmount(1));
-        if (best == null) {
-            return null;
+    private static PreparedRecipe findLargestFactoryBatch(AEUpgradeNode node, IAEItemRecipeHost host,
+          AEAutoProcessingProgram.Entry entry, AEProviderBackedRecipeAdapter.AutoProcessingSearch search) {
+        AEExposedRecipe recipe = entry.recipe;
+        // Local capacity reads hold the machine transaction; AE simulations stay outside it.
+        int hint = search != null ? node.callMachineContainerTransaction(search::suggestBatch) :
+              host instanceof IAERecipeMachineHost providerHost ?
+              node.callMachineContainerTransaction(() ->
+                    AEProviderBackedRecipeAdapter.suggestAutoProcessingBatch(providerHost, recipe)) : recipe.getCraftAmount();
+        int multiple = Math.max(1, node.getAutoProcessingBatchMultiple());
+        if (multiple > 1 && recipe.getCraftAmount() >= multiple) {
+            PreparedRecipe balanced = AEFactoryBatchSearch.find(recipe.getCraftAmount() / multiple,
+                  Math.max(1, hint / multiple), rounds -> prepareRecipe(node, host, entry.batch(rounds * multiple), search));
+            if (balanced != null) return balanced;
         }
-        int low = 2;
-        int high = recipe.getCraftAmount() - 1;
-        while (low <= high) {
-            int amount = low + (int) (((long) high - low) / 2);
-            PreparedRecipe candidate = prepareRecipe(node, host, recipe.withCraftAmount(amount));
-            if (candidate == null) {
-                high = amount - 1;
-            } else {
-                best = candidate;
-                low = amount + 1;
-            }
-        }
-        return best;
+        return AEFactoryBatchSearch.find(recipe.getCraftAmount(), hint,
+              amount -> prepareRecipe(node, host, entry.batch(amount), search));
     }
 
     private static final class PreparedRecipe {
@@ -132,11 +167,17 @@ public final class AEAutoProcessingController {
         private final AEExposedRecipe recipe;
         private final AERecipeNetworkTransferPlan inputPlan;
         private final List<ItemStack> legacyInputs;
+        private final AEProviderBackedRecipeAdapter.AutoProcessingInputs refill;
+        private final AEProviderBackedRecipeAdapter.AutoProcessingCandidate candidate;
 
-        private PreparedRecipe(AEExposedRecipe recipe, AERecipeNetworkTransferPlan inputPlan, List<ItemStack> legacyInputs) {
+        private PreparedRecipe(AEExposedRecipe recipe, AERecipeNetworkTransferPlan inputPlan, List<ItemStack> legacyInputs,
+                               AEProviderBackedRecipeAdapter.AutoProcessingInputs refill,
+                               AEProviderBackedRecipeAdapter.AutoProcessingCandidate candidate) {
             this.recipe = recipe;
             this.inputPlan = inputPlan;
             this.legacyInputs = legacyInputs;
+            this.refill = refill;
+            this.candidate = candidate;
         }
     }
 }

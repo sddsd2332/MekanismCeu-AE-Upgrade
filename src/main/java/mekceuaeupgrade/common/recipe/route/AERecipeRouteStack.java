@@ -45,6 +45,26 @@ public record AERecipeRouteStack(
         legacyItemStack = copy(legacyItemStack);
     }
 
+    // A route is shared by every batch size. Do not expose its mutable stack payloads:
+    // provider candidate bindings may reuse the identity of this immutable declaration.
+    public ItemStack itemStack() {
+        return copy(itemStack);
+    }
+
+    @Nullable
+    public GasStack gasStack() {
+        return copy(gasStack);
+    }
+
+    @Nullable
+    public FluidStack fluidStack() {
+        return copy(fluidStack);
+    }
+
+    public ItemStack legacyItemStack() {
+        return copy(legacyItemStack);
+    }
+
     /**
      * 创建物品 route 栈。
      *

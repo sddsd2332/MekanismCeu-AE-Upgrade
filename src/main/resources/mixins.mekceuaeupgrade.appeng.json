@@ -8,6 +8,8 @@
   "mixins": [
     "appeng.MixinContainerMEMonitorable",
     "appeng.MixinCraftingGridCache",
+    "appeng.MixinEnergyGridCache",
+    "appeng.MixinGrid",
     "appeng.MixinNetworkMonitor",
     "appeng.MixinPlayerData"
   ],

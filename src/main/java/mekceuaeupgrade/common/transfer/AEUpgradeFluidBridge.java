@@ -17,6 +17,31 @@ import javax.annotation.Nullable;
  */
 public final class AEUpgradeFluidBridge {
 
+    public static FluidStack deliverOwned(AEUpgradeNode node, FluidStack stack) {
+        if (stack == null || stack.amount <= 0 || !node.canUseNetwork()) return stack;
+        IFluidStorageChannel channel = getFluidStorageChannel();
+        if (channel == null) return stack;
+        IMEInventory<IAEFluidStack> inventory;
+        try { inventory = node.getInventory(channel); }
+        catch (GridAccessException failure) { return stack; }
+        IAEFluidStack offered = AEFluidStack.fromFluidStack(stack);
+        if (inventory == null || offered == null) return stack;
+        try {
+            IAEFluidStack remainder = inventory.injectItems(offered, Actionable.MODULATE, node.getActionSource());
+            if (remainder != null && (remainder.getStackSize() < 0 || remainder.getStackSize() > stack.amount)) {
+                throw new IllegalStateException("Invalid fluid delivery remainder");
+            }
+            FluidStack result = remainder == null ? null : remainder.getFluidStack();
+            if (remainder != null && remainder.getStackSize() > 0 &&
+                  (result == null || result.amount != remainder.getStackSize())) {
+                throw new IllegalStateException("Unrepresentable fluid delivery remainder");
+            }
+            return result;
+        } catch (RuntimeException | LinkageError failure) {
+            throw new UncertainNetworkDeliveryException(failure);
+        }
+    }
+
     private static volatile boolean channelResolved;
     @Nullable
     private static volatile IFluidStorageChannel fluidStorageChannel;

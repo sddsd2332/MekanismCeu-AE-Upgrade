@@ -13,6 +13,9 @@ import mekanism.common.recipe.machines.BasicMachineRecipe;
 import mekanism.common.recipe.machines.Chance2MachineRecipe;
 import mekanism.common.recipe.machines.ChanceMachineRecipe;
 import mekanism.common.recipe.machines.DoubleMachineRecipe;
+import mekanism.common.recipe.machines.RecyclerRecipe;
+import mekanism.common.recipe.outputs.ChanceOutput2;
+import mekanism.common.MekanismItems;
 import mekanism.common.recipe.outputs.ChanceOutput;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
@@ -22,6 +25,7 @@ import mekceuaeupgrade.common.transfer.AERecipePort;
 import mekceuaeupgrade.common.transfer.AERecipeTransferPlan;
 import mekceuaeupgrade.common.util.AEUpgradeDebug;
 import net.minecraft.item.ItemStack;
+import mekanism.common.tile.machine.TileEntityRecycler;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import java.util.Arrays;
@@ -276,6 +280,12 @@ public final class AEItemRecipeAdapters {
                 }
                 ItemStack simulatedInput = getSimulatedStackWithInsert(input, stack);
                 RECIPE machineRecipe = getChance2Recipe(recipes, refreshRecipeLookupCache, simulatedInput);
+                if (machineRecipe == null && host instanceof TileEntityRecycler) {
+                    @SuppressWarnings("unchecked")
+                    RECIPE temporary = (RECIPE) new RecyclerRecipe(new ItemStackInput(simulatedInput.copy()),
+                          new ChanceOutput2(new ItemStack(MekanismItems.Scrap), 1F / 6F));
+                    machineRecipe = temporary;
+                }
                 if (machineRecipe == null) {
                     return reject(host, "no Mekanism recipe for simulated input {}", AEUpgradeDebug.stack(simulatedInput));
                 }
@@ -325,6 +335,12 @@ public final class AEItemRecipeAdapters {
                     return true;
                 }
                 RECIPE recipe = getChance2Recipe(recipes, refreshRecipeLookupCache, current);
+                if (recipe == null && host instanceof TileEntityRecycler) {
+                    @SuppressWarnings("unchecked")
+                    RECIPE temporary = (RECIPE) new RecyclerRecipe(new ItemStackInput(current.copy()),
+                          new ChanceOutput2(new ItemStack(MekanismItems.Scrap), 1F / 6F));
+                    recipe = temporary;
+                }
                 return recipe != null && recipe.getOutput().primaryChance >= 1 && canOutputToSlot(output, recipe.getOutput().getMaxPrimaryOutput()) &&
                       hasInputRoom(input, current);
             }

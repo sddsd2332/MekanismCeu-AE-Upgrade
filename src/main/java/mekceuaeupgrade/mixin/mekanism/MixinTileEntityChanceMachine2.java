@@ -7,6 +7,7 @@ import mekanism.common.recipe.inputs.ItemStackInput;
 import mekanism.common.recipe.machines.Chance2MachineRecipe;
 import mekanism.common.recipe.outputs.ChanceOutput2;
 import mekanism.common.tile.prefab.TileEntityChanceMachine2;
+import mekanism.common.tile.machine.TileEntityRecycler;
 import mekanism.common.tile.prefab.TileEntityUpgradeableMachine;
 import mekceuaeupgrade.common.adapter.AEItemRecipeAdapters;
 import mekceuaeupgrade.common.adapter.IAERecipeMachineAdapter;

@@ -26,6 +26,31 @@ public final class AEUpgradeGasBridge {
         return getGasStorageChannel() != null;
     }
 
+    public static GasStack deliverOwned(AEUpgradeNode node, GasStack stack) {
+        if (stack == null || stack.amount <= 0 || !node.canUseNetwork()) return stack;
+        IGasStorageChannel channel = getGasStorageChannel();
+        if (channel == null) return stack;
+        IMEInventory<IAEGasStack> inventory;
+        try { inventory = node.getInventory(channel); }
+        catch (GridAccessException failure) { return stack; }
+        IAEGasStack offered = AEGasStack.of(stack);
+        if (inventory == null || offered == null) return stack;
+        try {
+            IAEGasStack remainder = inventory.injectItems(offered, Actionable.MODULATE, node.getActionSource());
+            if (remainder != null && (remainder.getStackSize() < 0 || remainder.getStackSize() > stack.amount)) {
+                throw new IllegalStateException("Invalid gas delivery remainder");
+            }
+            GasStack result = toGasStack(remainder);
+            if (remainder != null && remainder.getStackSize() > 0 &&
+                  (result == null || result.amount != remainder.getStackSize())) {
+                throw new IllegalStateException("Unrepresentable gas delivery remainder");
+            }
+            return result;
+        } catch (RuntimeException | LinkageError failure) {
+            throw new UncertainNetworkDeliveryException(failure);
+        }
+    }
+
     @Nullable
     public static GasStack inject(AEUpgradeNode node, GasStack stack, Actionable action) {
         if (stack == null || stack.getGas() == null || stack.amount <= 0 || !node.canUseNetwork()) {

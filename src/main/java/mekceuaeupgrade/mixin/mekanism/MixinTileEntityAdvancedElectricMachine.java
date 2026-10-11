@@ -1,7 +1,6 @@
 package mekceuaeupgrade.mixin.mekanism;
 
 import mekanism.api.gas.Gas;
-import mekanism.api.math.MathUtils;
 import mekanism.common.Upgrade;
 import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.capabilities.gas.BasicGasTank;
@@ -42,8 +41,6 @@ public abstract class MixinTileEntityAdvancedElectricMachine<RECIPE extends Adva
     protected GasInventorySlot gasSlot;
     @Shadow
     protected OutputInventorySlot outputSlot;
-    @Shadow
-    private long baseTotalUsage;
     @Unique
     private volatile AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
 
@@ -64,6 +61,9 @@ public abstract class MixinTileEntityAdvancedElectricMachine<RECIPE extends Adva
 
     @Shadow
     public abstract boolean useStatisticalMechanics();
+
+    @Shadow
+    public abstract int getRecipeGasUsagePerOperation();
 
     @Override
     public AEUpgradeNode getAEUpgradeNode() {
@@ -114,14 +114,6 @@ public abstract class MixinTileEntityAdvancedElectricMachine<RECIPE extends Adva
 
     @Unique
     private int mekceuaeupgrade$getAEGasUsagePerOperation() {
-        long usage = useStatisticalMechanics() ? mekceuaeupgrade$getAEStatisticalGasUsageLimit() : baseTotalUsage;
-        return Math.max(1, MathUtils.clampToInt(usage));
-    }
-
-    @Unique
-    private long mekceuaeupgrade$getAEStatisticalGasUsageLimit() {
-        int ticks = Math.max(1, getTicksRequired());
-        long maxPerTick = 3L * Math.max(1, (long) Math.ceil(Math.max(secondaryEnergyPerTick, 0)));
-        return maxPerTick * ticks;
+        return getRecipeGasUsagePerOperation();
     }
 }

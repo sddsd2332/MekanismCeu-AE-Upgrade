@@ -19,6 +19,7 @@ import java.util.Comparator;
 public final class AEUpgrade {
 
     public static final Upgrade AE_CRAFTING = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_crafting")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.AQUA)
@@ -31,6 +32,7 @@ public final class AEUpgrade {
           .register();
 
     public static final Upgrade AE_OUTPUT = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_output")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.DARK_AQUA)
@@ -44,6 +46,7 @@ public final class AEUpgrade {
           .register();
 
     public static final Upgrade AE_AUTO_PROCESSING = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_auto_processing")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.PURPLE)
@@ -57,6 +60,7 @@ public final class AEUpgrade {
           .register();
 
     public static final Upgrade AE_WIRELESS_CRAFTING = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_wireless_crafting")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.BRIGHT_GREEN)
@@ -70,6 +74,7 @@ public final class AEUpgrade {
           .register();
 
     public static final Upgrade AE_WIRELESS_AUTO_PROCESSING = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_wireless_auto_processing")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.PINK)
@@ -83,6 +88,7 @@ public final class AEUpgrade {
           .register();
 
     public static final Upgrade AE_WIRELESS_OUTPUT = Upgrade.builder(MEKCeuAEUpgrade.MODID, "ae_wireless_output")
+          .deterministicSecondaryUsage()
           .maxInstalled(1)
           .maxItemStackSize(64)
           .color(EnumColor.DARK_GREEN)
@@ -133,20 +139,8 @@ public final class AEUpgrade {
     }
 
     private static void handleAEUpgradeChanged(IAEUpgradeHost host, mekanism.common.Upgrade upgrade, int previousAmount, int amount) {
-        host.getAEUpgradeNode().onUpgradeConfigurationChanged();
-        if (amount <= 0 && previousAmount > 0) {
-            if (upgrade == AE_WIRELESS_CRAFTING) {
-                host.getAEUpgradeNode().setWirelessCraftingKey(null);
-            } else if (upgrade == AE_WIRELESS_AUTO_PROCESSING) {
-                host.getAEUpgradeNode().setWirelessAutoProcessingKey(null);
-            } else if (upgrade == AE_WIRELESS_OUTPUT) {
-                host.getAEUpgradeNode().setWirelessOutputKey(null);
-            }
-        }
-        if (amount > 0 || host.hasAEUpgrade()) {
-            host.onAEUpgradeInstalled();
-        } else {
-            host.onAEUpgradeRemoved();
+        if (host instanceof mekceuaeupgrade.common.host.IAEUpgradeHostBridge bridge) {
+            bridge.mekceuaeupgrade$getAEUpgradeDelegate().onUpgradeCommitted(upgrade, previousAmount, amount);
         }
     }
 

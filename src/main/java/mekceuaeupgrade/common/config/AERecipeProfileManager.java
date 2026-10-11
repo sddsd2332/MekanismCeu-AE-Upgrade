@@ -8,6 +8,8 @@ import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.security.ISecurityTile;
 import mekanism.common.tile.factory.TileEntityFactory;
 import mekanism.common.tile.prefab.TileEntityBasicBlock;
+import mekanism.common.tile.prefab.TileEntityMachine;
+import mekanism.common.tile.component.TileComponentSecurity;
 import mekceuaeupgrade.common.core.MEKCeuAEUpgrade;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.host.IAEItemRecipeHost;
@@ -43,6 +45,151 @@ public final class AERecipeProfileManager {
     private static final String CONFIG_CARD_AUTO_PROCESSING_PROFILE_GLOBAL_SLOT_TAG = "aeAutoProcessingRecipeProfileGlobalSlot";
 
     private static final Map<ProfileIdentity, AERecipeProfile> profiles = new HashMap<>();
+    private static volatile long profileRevision;
+
+    private static final ClassValue<Boolean> DIRECT_SECURITY_FIELD = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            if (!TileEntityMachine.class.isAssignableFrom(type)) return false;
+            try {
+                return type.getMethod("getSecurity").getDeclaringClass() == TileEntityMachine.class;
+            } catch (ReflectiveOperationException | SecurityException ignored) { return false; }
+        }
+    };
+
+    /** Cache accessor classification, never the owner or replaceable security component. */
+    static final class OwnerLookup {
+        private TileEntity tile;
+        private TileEntityMachine nativeMachine;
+        private ISecurityTile securityTile;
+        private TileComponentSecurity cachedSecurity;
+        private long securityRevision = Long.MIN_VALUE;
+        private UUID cachedOwner;
+
+        void clear() {tile = null; nativeMachine = null; securityTile = null; cachedSecurity = null; securityRevision = Long.MIN_VALUE; cachedOwner = null;}
+
+        UUID get(TileEntity current, AEUpgradeNode node) {
+            if (tile != current) {
+                tile = current;
+                nativeMachine = DIRECT_SECURITY_FIELD.get(current.getClass()) ? (TileEntityMachine) current : null;
+                securityTile = nativeMachine == null && current instanceof ISecurityTile security ? security : null;
+            }
+            TileComponentSecurity security = nativeMachine != null ? nativeMachine.securityComponent :
+                  securityTile == null ? null : securityTile.getSecurity();
+            UUID owner;
+            if (security == null) {
+                // Unknown security providers have no revision contract. Keep their original
+                // live read and let custom components decide their own mutation semantics.
+                cachedSecurity = null;
+                securityRevision = Long.MIN_VALUE;
+                cachedOwner = null;
+                owner = null;
+            } else {
+                long currentRevision = security.getOwnerRevision();
+                if (cachedSecurity != security || securityRevision != currentRevision) {
+                    cachedSecurity = security;
+                    securityRevision = currentRevision;
+                    cachedOwner = security.getOwnerUUID();
+                }
+                owner = cachedOwner;
+            }
+            return owner == null ? node.getRecipeProfileOwner() : owner;
+        }
+    }
+
+    // These native accessors have stable registry/save-directory identity for a World.
+    // Unknown overrides retain the full identity check.
+    private static final ClassValue<Boolean> NATIVE_IDENTITY = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            if (!TileEntityMachine.class.isAssignableFrom(type)) return false;
+            try {
+                return type.getMethod("getWorld").getDeclaringClass() == TileEntity.class &&
+                      type.getMethod("getBlockType").getDeclaringClass() == TileEntity.class &&
+                      type.getMethod("getBlockMetadata").getDeclaringClass() == TileEntity.class;
+            } catch (ReflectiveOperationException | SecurityException ignored) { return false; }
+        }
+    };
+
+    /** Host-owned fast lookup. All inputs to the disk identity remain live; no cached permission decision. */
+    public static final class ProfileLookup {
+        private final OwnerLookup ownerLookup = new OwnerLookup();
+        private World world;
+        private File directory;
+        private Block block;
+        private ResourceLocation blockName;
+        private int metadata, slot;
+        private Object factoryType;
+        private UUID owner, instance;
+        private boolean individual;
+        private AERecipeProfile.RouteFilterMode mode;
+        private AERecipeConfigType type;
+        private long revision = -1;
+        private AERecipeProfile profile;
+        private AEUpgradeNode boundNode;
+        private long nodeRevision;
+        private boolean nativeIdentity;
+        private net.minecraft.world.storage.ISaveHandler saveHandler;
+
+        public void clear() {world = null; directory = null; profile = null; revision = -1; boundNode = null; ownerLookup.clear();}
+
+        /** No profile lookup, UUID creation, or list construction on an unchanged waiting tick.
+         * Unknown node overrides use the original full identity path instead. */
+        public boolean isCurrent(IAEUpgradeHost host, AERecipeConfigType requestedType) {
+            if (profile == null || type != requestedType || revision != profileRevision ||
+                  !(host instanceof TileEntity tile) || boundNode == null || boundNode.getClass() != AEUpgradeNode.class ||
+                  host.getAEUpgradeNode() != boundNode || nodeRevision != boundNode.getRecipeProfileIdentityRevision()) return false;
+            World currentWorld = tile.getWorld();
+            if (world != currentWorld || currentWorld == null || currentWorld.isRemote) return false;
+            if (nativeIdentity) {
+                if (saveHandler != currentWorld.getSaveHandler()) return false;
+            } else if (currentWorld.getSaveHandler() == null ||
+                  !Objects.equals(directory, currentWorld.getSaveHandler().getWorldDirectory())) return false;
+            Block currentBlock = tile.getBlockType();
+            return block == currentBlock && (nativeIdentity || Objects.equals(blockName, currentBlock == null ? null : currentBlock.getRegistryName())) &&
+                  metadata == tile.getBlockMetadata() &&
+                  factoryType == (tile instanceof TileEntityFactory f ? f.getRecipeType() : null) &&
+                  Objects.equals(owner, ownerLookup.get(tile, boundNode));
+        }
+
+        @Nullable
+        public AERecipeProfile get(IAEUpgradeHost host, AERecipeConfigType requestedType) {
+            if (nativeIdentity && isCurrent(host, requestedType)) return profile;
+            if (!(host instanceof TileEntity tile)) return null;
+            World currentWorld = tile.getWorld();
+            if (currentWorld == null || currentWorld.isRemote || currentWorld.getSaveHandler() == null) {clear(); return null;}
+            AEUpgradeNode node = host.getAEUpgradeNode();
+            if (node == null) {clear(); return null;}
+            UUID currentOwner = ownerLookup.get(tile, node);
+            if (currentOwner == null) {clear(); return null;}
+            File currentDirectory = currentWorld.getSaveHandler().getWorldDirectory();
+            Block currentBlock = tile.getBlockType();
+            ResourceLocation name = currentBlock == null ? null : currentBlock.getRegistryName();
+            int meta = tile.getBlockMetadata();
+            Object factory = tile instanceof TileEntityFactory f ? f.getRecipeType() : null;
+            boolean single = node.isRecipeProfileIndividual(requestedType);
+            UUID id = single ? node.getOrCreateRecipeProfileInstance(requestedType) : null;
+            int selectedSlot = single ? 0 : node.getRecipeProfileGlobalSlot(requestedType);
+            AERecipeProfile.RouteFilterMode filter = node.getRecipeProfileFilterMode(requestedType);
+            long currentRevision = profileRevision;
+            if (world == currentWorld && Objects.equals(directory, currentDirectory) && block == currentBlock &&
+                  Objects.equals(blockName, name) && metadata == meta && factoryType == factory &&
+                  Objects.equals(owner, currentOwner) && individual == single && Objects.equals(instance, id) &&
+                  slot == selectedSlot && mode == filter && type == requestedType && revision == currentRevision) {
+                boundNode = node; nodeRevision = node.getRecipeProfileIdentityRevision();
+                return profile;
+            }
+            AERecipeProfile resolved = AERecipeProfileManager.getProfile(host, requestedType);
+            world = currentWorld; directory = currentDirectory; block = currentBlock; blockName = name;
+            metadata = meta; factoryType = factory; owner = currentOwner; individual = single; instance = id;
+            slot = selectedSlot; mode = filter; type = requestedType; revision = currentRevision; profile = resolved;
+            boundNode = node; nodeRevision = node.getRecipeProfileIdentityRevision();
+            nativeIdentity = NATIVE_IDENTITY.get(tile.getClass());
+            saveHandler = currentWorld.getSaveHandler();
+            return resolved;
+        }
+    }
+    // Values contain no Tile/World references. Revalidate every identity input on
+    // lookup rather than relying on change notifications from third-party hosts.
+    private static final Map<TileEntity, EnumMap<AERecipeConfigType, IdentityMemo>> identityMemos = new WeakHashMap<>();
     private static final Set<IAEUpgradeHost> activeHosts = Collections.newSetFromMap(new WeakHashMap<>());
 
     private AERecipeProfileManager() {
@@ -85,6 +232,7 @@ public final class AERecipeProfileManager {
 
     public static void unregisterHost(IAEUpgradeHost host) {
         activeHosts.remove(host);
+        if (host instanceof TileEntity tile) identityMemos.remove(tile);
     }
 
     @Nullable
@@ -669,6 +817,9 @@ public final class AERecipeProfileManager {
         }
         String worldPath = world.getSaveHandler().getWorldDirectory().getAbsolutePath();
         profiles.keySet().removeIf(identity -> identity.worldPath().equals(worldPath));
+        profileRevision++;
+        identityMemos.values().removeIf(entries -> entries.values().stream()
+              .anyMatch(memo -> memo.identity.worldPath().equals(worldPath)));
         activeHosts.removeIf(host -> host instanceof TileEntity tile && tile.getWorld() == world);
     }
 
@@ -822,6 +973,7 @@ public final class AERecipeProfileManager {
             return;
         }
         profiles.put(identity, profile);
+        profileRevision++;
         profile.setRouteFilterMode(identity.filterMode());
         File file = identity.file();
         if (profile.isEmpty()) {
@@ -905,13 +1057,22 @@ public final class AERecipeProfileManager {
         }
         File worldDirectory = world.getSaveHandler().getWorldDirectory();
         String machineId = resolveMachineId(tile);
+        AEUpgradeNode node = tile instanceof IAEUpgradeHost host ? host.getAEUpgradeNode() : null;
+        if (node == null) return null;
+        AERecipeProfile.RouteFilterMode filterMode = node.getRecipeProfileFilterMode(type);
+        UUID instance = individual ? node.getOrCreateRecipeProfileInstance(type) : null;
+        int slot = individual ? 0 : Math.max(AEUpgradeNode.MIN_GLOBAL_PROFILE_SLOT,
+              Math.min(AEUpgradeNode.MAX_GLOBAL_PROFILE_SLOT, node.getRecipeProfileGlobalSlot(type)));
+        EnumMap<AERecipeConfigType, IdentityMemo> entries = identityMemos.get(tile);
+        IdentityMemo memo = entries == null ? null : entries.get(type);
+        if (memo != null && memo.matches(worldDirectory, machineId, owner, individual, filterMode, instance, slot)) {
+            return memo.identity;
+        }
         File ownerDirectory = new File(new File(new File(worldDirectory, "data"), "mek"), owner.toString());
         String machineDirectoryName = sanitize(machineId).toLowerCase(Locale.ROOT) + "_" + digest(machineId).substring(0, 12);
         File machineDirectory = new File(ownerDirectory, machineDirectoryName);
         File typeDirectory = new File(machineDirectory, type.getId());
         File directory = new File(typeDirectory, individual ? "single" : "global");
-        AERecipeProfile.RouteFilterMode filterMode = tile instanceof IAEUpgradeHost host ? host.getAEUpgradeNode().getRecipeProfileFilterMode(type) :
-              type.getDefaultFilterMode();
         if (type.isRouteFilterMutable()) {
             directory = new File(directory, filterMode.name().toLowerCase(Locale.ROOT));
         }
@@ -919,37 +1080,60 @@ public final class AERecipeProfileManager {
               (type.isRouteFilterMutable() ? filterMode.name().toLowerCase(Locale.ROOT) + "/" : "");
         String fileName;
         if (individual) {
-            if (!(tile instanceof IAEUpgradeHost host)) {
-                return null;
-            }
-            UUID instance = host.getAEUpgradeNode().getOrCreateRecipeProfileInstance(type);
             profileId += instance;
             fileName = instance + ".dat";
-        } else if (tile instanceof IAEUpgradeHost host) {
-            int slot = Math.max(AEUpgradeNode.MIN_GLOBAL_PROFILE_SLOT,
-                  Math.min(AEUpgradeNode.MAX_GLOBAL_PROFILE_SLOT, host.getAEUpgradeNode().getRecipeProfileGlobalSlot(type)));
+        } else {
             profileId += slot;
             fileName = String.format(Locale.ROOT, "slot_%02d.dat", slot);
-        } else {
-            return null;
         }
         File file = new File(directory, fileName);
-        return new ProfileIdentity(worldDirectory.getAbsolutePath(), owner, profileId, individual, type, filterMode, file);
+        ProfileIdentity identity = new ProfileIdentity(worldDirectory.getAbsolutePath(), owner, profileId, individual, type, filterMode, file);
+        if (entries == null) {
+            entries = new EnumMap<>(AERecipeConfigType.class);
+            identityMemos.put(tile, entries);
+        }
+        entries.put(type, new IdentityMemo(worldDirectory, machineId, instance, slot, identity));
+        return identity;
+    }
+
+    private static final class IdentityMemo {
+        final File worldDirectory;
+        final String machineId;
+        final UUID instance;
+        final int slot;
+        final ProfileIdentity identity;
+        IdentityMemo(File worldDirectory, String machineId, UUID instance, int slot, ProfileIdentity identity) {
+            this.worldDirectory = worldDirectory;
+            this.machineId = machineId;
+            this.instance = instance;
+            this.slot = slot;
+            this.identity = identity;
+        }
+        boolean matches(File directory, String machine, UUID owner, boolean individual,
+              AERecipeProfile.RouteFilterMode mode, UUID instance, int slot) {
+            return worldDirectory.equals(directory) && machineId.equals(machine) && identity.owner().equals(owner) &&
+                  identity.individual() == individual && identity.filterMode() == mode &&
+                  Objects.equals(this.instance, instance) && this.slot == slot;
+        }
     }
 
     @Nullable
     private static UUID resolveOwner(TileEntity tile, @Nullable EntityPlayer player) {
-        if (tile instanceof ISecurityTile securityTile && securityTile.getSecurity().getOwnerUUID() != null) {
-            return securityTile.getSecurity().getOwnerUUID();
+        if (tile instanceof ISecurityTile securityTile) {
+            TileComponentSecurity security = securityTile.getSecurity();
+            UUID owner = security == null ? null : security.getOwnerUUID();
+            if (owner != null) return owner;
         }
         if (tile instanceof IAEUpgradeHost host) {
-            UUID fallbackOwner = host.getAEUpgradeNode().getRecipeProfileOwner();
+            AEUpgradeNode node = host.getAEUpgradeNode();
+            if (node == null) return player == null ? null : player.getUniqueID();
+            UUID fallbackOwner = node.getRecipeProfileOwner();
             if (fallbackOwner != null) {
                 return fallbackOwner;
             }
             if (player != null) {
                 UUID playerId = player.getUniqueID();
-                host.getAEUpgradeNode().setRecipeProfileOwner(playerId);
+                node.setRecipeProfileOwner(playerId);
                 return playerId;
             }
         }

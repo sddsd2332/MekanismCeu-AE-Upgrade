@@ -49,6 +49,10 @@ public final class AEIncrementalCraftingIndex {
     private final Map<IAEItemStack, ImmutableList<ICraftingPatternDetails>> craftingByOutput = new HashMap<>();
     private final Map<IAEItemStack, MergedPatternSnapshot> mergedCraftingByOutput = new HashMap<>();
     private final ArrayDeque<PendingReconcile> pending = new ArrayDeque<>();
+    private volatile boolean pendingChanges;
+
+    /** A false result may race a new enqueue; that work is handled on the following grid tick. */
+    public boolean hasPendingChanges() {return pendingChanges;}
     private ImmutableList<IAEItemStack> craftableOutputs = ImmutableList.of();
     private boolean craftableOutputsDirty;
 
@@ -123,6 +127,7 @@ public final class AEIncrementalCraftingIndex {
         // A provider can have both additions and removals waiting in the bounded reconcile queue.
         // None of those operations may be allowed to resurrect the provider after this call.
         pending.removeIf(change -> change.state == state);
+        pendingChanges = !pending.isEmpty();
         state.queued.clear();
         state.desired.clear();
 
@@ -150,6 +155,7 @@ public final class AEIncrementalCraftingIndex {
 
     public synchronized List<IAEItemStack> processPendingChanges(Predicate<IAEItemStack> nativeCraftable) {
         if (pending.isEmpty()) {
+            pendingChanges = false;
             return Collections.emptyList();
         }
 
@@ -160,6 +166,7 @@ public final class AEIncrementalCraftingIndex {
         }
         Map<IAEItemStack, Boolean> originalCraftability = new LinkedHashMap<>();
 
+        try {
         while (!pending.isEmpty() && nanoTime.getAsLong() < deadline) {
             PendingReconcile change = pending.removeFirst();
             ProviderState state = change.state;
@@ -170,6 +177,7 @@ public final class AEIncrementalCraftingIndex {
             reconcile(state, change.recipe);
             cleanupProvider(state);
         }
+        } finally {pendingChanges = !pending.isEmpty();}
 
         if (originalCraftability.isEmpty()) {
             return Collections.emptyList();
@@ -503,6 +511,7 @@ public final class AEIncrementalCraftingIndex {
     private void queueReconcile(ProviderState state, ICraftingPatternDetails recipe) {
         if (state.queued.add(recipe)) {
             pending.addLast(new PendingReconcile(state, recipe));
+            pendingChanges = true;
         }
     }
 

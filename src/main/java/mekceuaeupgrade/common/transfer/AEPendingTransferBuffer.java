@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -24,7 +25,7 @@ import java.util.function.Function;
  *
  * <p>All transfers in this project are synchronous server-thread operations. PREPARED therefore owns no resource and
  * is not persisted. Once an extraction returns, the entry becomes HELD before any delivery is attempted. DELIVERING
- * entries are persisted and recover as HELD so an interrupted delivery is retried conservatively.</p>
+ * entries recover as UNCERTAIN: without an acknowledgement, neither retry nor return-to-source is safe.</p>
  */
 public final class AEPendingTransferBuffer {
 
@@ -46,7 +47,8 @@ public final class AEPendingTransferBuffer {
     enum Phase {
         PREPARED,
         HELD,
-        DELIVERING
+        DELIVERING,
+        UNCERTAIN
     }
 
     private final Runnable changeListener;
@@ -62,21 +64,36 @@ public final class AEPendingTransferBuffer {
         if (expected == null || expected.isEmpty()) {
             throw new IllegalArgumentException("Prepared item transfer requires a non-empty stack");
         }
-        return prepare(Entry.item(UUID.randomUUID(), Phase.PREPARED, expected));
+        return prepare(Entry.item(newTransferId(), Phase.PREPARED, expected));
     }
 
     Entry prepareGas(GasStack expected) {
         if (!isValid(expected)) {
             throw new IllegalArgumentException("Prepared gas transfer requires a positive stack");
         }
-        return prepare(Entry.gas(UUID.randomUUID(), Phase.PREPARED, expected));
+        return prepare(Entry.gas(newTransferId(), Phase.PREPARED, expected));
     }
 
     Entry prepareFluid(FluidStack expected) {
         if (!isValid(expected)) {
             throw new IllegalArgumentException("Prepared fluid transfer requires a positive stack");
         }
-        return prepare(Entry.fluid(UUID.randomUUID(), Phase.PREPARED, expected));
+        return prepare(Entry.fluid(newTransferId(), Phase.PREPARED, expected));
+    }
+
+    /**
+     * Transfer IDs are persisted only as local ownership/debug identifiers; they are not security
+     * tokens and never cross an AE trust boundary. Keep the UUID wire format and collision checks,
+     * but avoid SecureRandom on every short-lived extraction.
+     */
+    private static UUID newTransferId() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        long most = random.nextLong();
+        long least = random.nextLong();
+        // Preserve the conventional RFC 4122 version-4/variant bits for diagnostics and tooling.
+        most = (most & 0xffffffffffff0fffL) | 0x0000000000004000L;
+        least = (least & 0x3fffffffffffffffL) | 0x8000000000000000L;
+        return new UUID(most, least);
     }
 
     private Entry prepare(Entry entry) {
@@ -132,15 +149,17 @@ public final class AEPendingTransferBuffer {
         return entries.contains(entry);
     }
 
+    boolean isPrepared(Entry entry) { return entries.contains(entry) && entry.phase == Phase.PREPARED; }
+
     boolean deliverToNetwork(Entry entry, AEUpgradeNode node) {
         Objects.requireNonNull(node, "Pending transfer AE node cannot be null");
         switch (entry.kind) {
             case ITEM:
-                return deliverItem(entry, stack -> node.injectItem(stack, Actionable.MODULATE));
+                return deliverItem(entry, node::deliverOwnedItem);
             case GAS:
-                return deliverGas(entry, stack -> node.injectGas(stack, Actionable.MODULATE));
+                return deliverGas(entry, node::deliverOwnedGas);
             case FLUID:
-                return deliverFluid(entry, stack -> node.injectFluid(stack, Actionable.MODULATE));
+                return deliverFluid(entry, node::deliverOwnedFluid);
             default:
                 return false;
         }
@@ -148,18 +167,22 @@ public final class AEPendingTransferBuffer {
 
     boolean deliverItem(Entry entry, Function<ItemStack, ItemStack> target) {
         requireOwned(entry, Kind.ITEM);
+        if (entry.phase == Phase.UNCERTAIN) return false;
         Objects.requireNonNull(target, "Pending item transfer target cannot be null");
         ItemStack sent = entry.item.copy();
         beginDelivery(entry);
         ItemStack remainder;
         try {
             remainder = target.apply(sent.copy());
+        } catch (UncertainNetworkDeliveryException e) {
+            markUncertain(entry);
+            return false;
         } catch (RuntimeException | LinkageError e) {
             restoreHeld(entry);
             throw e;
         }
         if (!isValidRemainder(sent, remainder)) {
-            restoreHeld(entry);
+            markUncertain(entry);
             return false;
         }
         if (remainder == null || remainder.isEmpty()) {
@@ -173,18 +196,22 @@ public final class AEPendingTransferBuffer {
 
     boolean deliverGas(Entry entry, Function<GasStack, GasStack> target) {
         requireOwned(entry, Kind.GAS);
+        if (entry.phase == Phase.UNCERTAIN) return false;
         Objects.requireNonNull(target, "Pending gas transfer target cannot be null");
         GasStack sent = entry.gas.copy();
         beginDelivery(entry);
         GasStack remainder;
         try {
             remainder = target.apply(sent.copy());
+        } catch (UncertainNetworkDeliveryException e) {
+            markUncertain(entry);
+            return false;
         } catch (RuntimeException | LinkageError e) {
             restoreHeld(entry);
             throw e;
         }
         if (!isValidRemainder(sent, remainder)) {
-            restoreHeld(entry);
+            markUncertain(entry);
             return false;
         }
         if (!isValid(remainder)) {
@@ -198,18 +225,22 @@ public final class AEPendingTransferBuffer {
 
     boolean deliverFluid(Entry entry, Function<FluidStack, FluidStack> target) {
         requireOwned(entry, Kind.FLUID);
+        if (entry.phase == Phase.UNCERTAIN) return false;
         Objects.requireNonNull(target, "Pending fluid transfer target cannot be null");
         FluidStack sent = entry.fluid.copy();
         beginDelivery(entry);
         FluidStack remainder;
         try {
             remainder = target.apply(sent.copy());
+        } catch (UncertainNetworkDeliveryException e) {
+            markUncertain(entry);
+            return false;
         } catch (RuntimeException | LinkageError e) {
             restoreHeld(entry);
             throw e;
         }
         if (!isValidRemainder(sent, remainder)) {
-            restoreHeld(entry);
+            markUncertain(entry);
             return false;
         }
         if (!isValid(remainder)) {
@@ -228,6 +259,45 @@ public final class AEPendingTransferBuffer {
         for (Entry entry : new ArrayList<>(entries)) {
             if (contains(entry) && entry.phase != Phase.PREPARED) {
                 deliverToNetwork(entry, node);
+            }
+        }
+        return !hasOwnedResources();
+    }
+
+    /** Return held resources to accepting machine containers after the upgrade is removed.
+     * Each individual delivery checkpoints its remainder; full or incompatible containers keep the buffer intact.
+     * The caller owns the machine transaction lock. No network calls or new extraction occur here.
+     */
+    public boolean retryMachine(mekanism.common.tile.prefab.TileEntityContainerBlock tile) {
+        if (quarantinedData != null || !hasOwnedResources()) return !hasOwnedResources();
+        for (Entry entry : new ArrayList<>(entries)) {
+            if (entry.phase == Phase.PREPARED) continue;
+            switch (entry.kind) {
+                case ITEM:
+                    for (mekanism.api.inventory.IInventorySlot slot : tile.getInventorySlots(null)) {
+                        if (!contains(entry)) break;
+                        deliverItem(entry, stack -> slot.insertItem(stack, mekanism.api.Action.EXECUTE,
+                              mekanism.api.AutomationType.EXTERNAL));
+                    }
+                    break;
+                case GAS:
+                    for (mekanism.api.gas.IGasTank tank : tile.getGasTanks(null)) {
+                        if (!contains(entry)) break;
+                        if (tank instanceof mekanism.api.gas.IExtendedGasTank extended) {
+                            deliverGas(entry, stack -> extended.insert(stack, mekanism.api.Action.EXECUTE,
+                                  mekanism.api.AutomationType.EXTERNAL));
+                        }
+                    }
+                    break;
+                case FLUID:
+                    for (net.minecraftforge.fluids.IFluidTank tank : tile.getFluidTanks(null)) {
+                        if (!contains(entry)) break;
+                        if (tank instanceof mekanism.api.fluid.IExtendedFluidTank extended) {
+                            deliverFluid(entry, stack -> extended.insert(stack, mekanism.api.Action.EXECUTE,
+                                  mekanism.api.AutomationType.EXTERNAL));
+                        }
+                    }
+                    break;
             }
         }
         return !hasOwnedResources();
@@ -304,7 +374,9 @@ public final class AEPendingTransferBuffer {
      * can recover it. This keeps a bad entry from crashing chunk loading without silently discarding owned resources.
      */
     public boolean hasQuarantinedData() {
-        return quarantinedData != null;
+        if (quarantinedData != null) return true;
+        for (Entry entry : entries) if (entry.phase == Phase.UNCERTAIN) return true;
+        return false;
     }
 
     void beginDelivery(Entry entry) {
@@ -317,6 +389,15 @@ public final class AEPendingTransferBuffer {
         requirePresent(entry);
         entry.phase = Phase.HELD;
         changed();
+    }
+
+    void markUncertain(Entry entry) {
+        requireOwned(entry);
+        boolean newlyUncertain = entry.phase != Phase.UNCERTAIN;
+        entry.phase = Phase.UNCERTAIN;
+        changed();
+        if (newlyUncertain) mekceuaeupgrade.common.core.MEKCeuAEUpgrade.logger.error(
+              "AE transfer {} has an uncertain delivery outcome; preserved for inspection, automatic replay and return are blocked", entry.id);
     }
 
     private void remove(Entry entry) {
@@ -446,7 +527,8 @@ public final class AEPendingTransferBuffer {
                 if (serializedPhase == Phase.PREPARED || !data.hasKey(RESOURCE_TAG, NBT.TAG_COMPOUND)) {
                     throw new IllegalArgumentException("Persisted pending transfer must own a resource");
                 }
-                Phase recoveredPhase = Phase.HELD;
+                Phase recoveredPhase = serializedPhase == Phase.DELIVERING || serializedPhase == Phase.UNCERTAIN
+                      ? Phase.UNCERTAIN : Phase.HELD;
                 NBTTagCompound resource = data.getCompoundTag(RESOURCE_TAG);
                 int amount = data.getInteger(AMOUNT_TAG);
                 if (amount <= 0) {

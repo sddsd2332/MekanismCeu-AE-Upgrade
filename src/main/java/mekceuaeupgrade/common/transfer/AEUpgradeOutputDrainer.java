@@ -10,6 +10,8 @@ import mekanism.api.inventory.IInventorySlot;
 import mekanism.api.processing.MachinePort;
 import mekanism.api.processing.MachineResourceStack;
 import mekanism.api.processing.MachineTransferPlan;
+import mekanism.api.processing.NativeOutputAccess;
+import mekanism.api.processing.NativeOutputStack;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -45,6 +47,12 @@ public final class AEUpgradeOutputDrainer {
             }
             Object container = port.container();
             observeContainerMembers(node, container);
+            NativeOutputAccess nativeOutput = port.nativeOutput();
+            if (nativeOutput != null) {
+                drained |= drainNativePort(node, port, nativeOutput);
+                if (node.getPendingTransferBuffer().hasOwnedResources()) return drained;
+                continue;
+            }
             List<MachineResourceStack> stored = new ArrayList<>(port.peekAll());
             for (MachineResourceStack resource : stored) {
                 if (node.getPendingTransferBuffer().hasOwnedResources()) {
@@ -53,11 +61,122 @@ public final class AEUpgradeOutputDrainer {
                 }
                 drained |= drainProviderResource(node, tile, port, resource);
             }
-            if (!port.peekAll().isEmpty()) {
+            if (hasRemainingOutput(port)) {
                 node.markOutputBlocked();
             }
         }
         return drained;
+    }
+
+    private static boolean drainNativePort(AEUpgradeNode node, MachinePort port, NativeOutputAccess access) {
+        AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
+        if (buffer.hasOwnedResources()) { node.markOutputBlocked(); return false; }
+        if (!node.canUseNetwork()) { node.markOutputBlocked(); return false; }
+        List<NativeOutputStack> candidates = node.callMachineContainerTransaction(access::peekAll);
+        boolean drained = false;
+        for (NativeOutputStack candidate : candidates) {
+            if (buffer.hasOwnedResources()) { node.markOutputBlocked(); break; }
+            int accepted;
+            switch (candidate.kind()) {
+                case ITEM: {
+                    ItemStack offered = candidate.itemStack();
+                    accepted = acceptedItemAmount(offered, node.injectItem(offered.copy(), Actionable.SIMULATE));
+                    break;
+                }
+                case GAS: {
+                    GasStack offered = candidate.gasStack();
+                    accepted = acceptedGasAmount(offered, node.injectGas(offered.copy(), Actionable.SIMULATE));
+                    break;
+                }
+                case FLUID: {
+                    FluidStack offered = candidate.fluidStack();
+                    accepted = acceptedFluidAmount(offered, node.injectFluid(offered.copy(), Actionable.SIMULATE));
+                    break;
+                }
+                default: continue;
+            }
+            if (accepted <= 0) { node.markOutputBlocked(); continue; }
+            NativeOutputStack expected = candidate.withAmount(accepted);
+            AEPendingTransferBuffer.Entry pending = prepareNative(buffer, expected);
+            boolean extracted;
+            try {
+                extracted = node.callMachineContainerTransaction(() -> {
+                    if (isExtractionGuarded(node, port.container())) return false;
+                    NativeOutputStack actual = access.extract(expected, container -> !isExtractionGuarded(node, container));
+                    if (actual == null) return false;
+                    holdNative(buffer, pending, actual);
+                    return true;
+                });
+            } catch (RuntimeException | LinkageError failure) {
+                // A failed restore/notification can make source ownership ambiguous. Preserve, never replay blindly.
+                if (pendingIsPrepared(buffer, pending)) holdNative(buffer, pending, expected);
+                buffer.markUncertain(pending);
+                node.markOutputBlocked();
+                return drained;
+            }
+            if (!extracted) {
+                buffer.cancelPrepared(pending);
+                node.markOutputBlocked();
+                continue;
+            }
+            drained = true;
+            // Cross-network calls occur only after releasing the local machine lock.
+            buffer.deliverToNetwork(pending, node);
+            if (buffer.contains(pending)) { node.markOutputBlocked(); break; }
+        }
+        // Output containers are observed before this method: a supported listener schedules an immediate
+        // follow-up drain, while unobservable containers use the existing bounded polling retry. Re-reading
+        // every slot/tank under the machine lock here only duplicates the earlier snapshot and can block
+        // the server thread behind an active machine transaction.
+        return drained;
+    }
+
+    private static boolean pendingIsPrepared(AEPendingTransferBuffer buffer, AEPendingTransferBuffer.Entry entry) {
+        return buffer.isPrepared(entry);
+    }
+
+    private static AEPendingTransferBuffer.Entry prepareNative(AEPendingTransferBuffer buffer, NativeOutputStack stack) {
+        switch (stack.kind()) {
+            case ITEM: return buffer.prepareItem(stack.itemStack());
+            case GAS: return buffer.prepareGas(stack.gasStack());
+            case FLUID: return buffer.prepareFluid(stack.fluidStack());
+            default: throw new IllegalArgumentException("Unsupported native output");
+        }
+    }
+
+    private static void holdNative(AEPendingTransferBuffer buffer, AEPendingTransferBuffer.Entry pending, NativeOutputStack stack) {
+        switch (stack.kind()) {
+            case ITEM: buffer.holdItem(pending, stack.itemStack()); break;
+            case GAS: buffer.holdGas(pending, stack.gasStack()); break;
+            case FLUID: buffer.holdFluid(pending, stack.fluidStack()); break;
+            default: throw new IllegalArgumentException("Unsupported native output");
+        }
+    }
+
+    private static final ClassValue<Boolean> BUILTIN_ITEM_PORT = new ClassValue<Boolean>() {
+        @Override protected Boolean computeValue(Class<?> type) {
+            return type.getClassLoader() == MachinePort.class.getClassLoader() &&
+                  (type.getName().equals("mekanism.api.processing.MachinePort$ItemPort") ||
+                   type.getName().equals("mekanism.api.processing.MachinePort$ItemGroupPort"));
+        }
+    };
+
+    private static boolean hasRemainingOutput(MachinePort port) {
+        // Only the core's exact final item-port implementations define peekAll as
+        // the nonempty backing slots. Avoid encoding every residual stack merely
+        // to ask whether a retry is needed. Custom/codec ports keep their own semantics.
+        if (BUILTIN_ITEM_PORT.get(port.getClass())) {
+            Object container = port.container();
+            if (container instanceof IInventorySlot slot) return !slot.getStack().isEmpty();
+            if (container instanceof List<?> slots) {
+                for (Object member : slots) {
+                    if (!(member instanceof IInventorySlot slot)) return !port.peekAll().isEmpty();
+                    if (!slot.getStack().isEmpty()) return true;
+                }
+                return false;
+            }
+        }
+        return !port.peekAll().isEmpty();
     }
 
     private static void observeContainerMembers(AEUpgradeNode node, Object container) {
@@ -270,55 +389,10 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了物品
      */
     public static boolean drainItemSlot(AEUpgradeNode node, IInventorySlot slot, AutomationType automationType) {
-        if (slot == null || automationType == null) {
-            return false;
-        }
+        if (node == null || slot == null || automationType == null) return false;
         node.observeOutputContainer(slot);
-        ItemStack stored = slot.getStack();
-        if (stored.isEmpty()) {
-            return false;
-        }
-        if (isExtractionGuarded(node, slot)) {
-            return false;
-        }
-        if (!node.canUseNetwork()) {
-            node.markOutputBlocked();
-            return false;
-        }
-        ItemStack remainder = node.injectItem(stored.copy(), Actionable.SIMULATE);
-        int accepted = acceptedItemAmount(stored, remainder);
-        if (accepted <= 0) {
-            node.markOutputBlocked();
-            return false;
-        }
-        if (isExtractionGuarded(node, slot)) {
-            return false;
-        }
-        ItemStack expected = stored.copy();
-        expected.setCount(accepted);
-        AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
-        AEPendingTransferBuffer.Entry pending = buffer.prepareItem(expected);
-        ItemStack extracted;
-        try {
-            extracted = slot.extractItem(accepted, Action.EXECUTE, automationType);
-        } catch (RuntimeException | LinkageError e) {
-            buffer.cancelPrepared(pending);
-            throw e;
-        }
-        if (extracted.isEmpty()) {
-            buffer.cancelPrepared(pending);
-            node.markOutputBlocked();
-            return false;
-        }
-        buffer.holdItem(pending, extracted);
-        buffer.deliverToNetwork(pending, node);
-        if (buffer.contains(pending)) {
-            buffer.deliverItem(pending, stack -> slot.insertItem(stack, Action.EXECUTE, AutomationType.INTERNAL));
-        }
-        if (buffer.contains(pending) || !slot.getStack().isEmpty()) {
-            node.markOutputBlocked();
-        }
-        return true;
+        MachinePort port = MachinePort.item("ae_native_item_output", MachinePort.Role.OUTPUT, slot, automationType);
+        return drainNativePort(node, port, port.nativeOutput());
     }
 
     /**
@@ -329,56 +403,10 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了气体
      */
     public static boolean drainGasTank(AEUpgradeNode node, IExtendedGasTank tank) {
-        if (tank == null) {
-            return false;
-        }
+        if (node == null || tank == null) return false;
         node.observeOutputContainer(tank);
-        GasStack stored = tank.getGas();
-        if (stored == null || stored.getGas() == null || stored.amount <= 0) {
-            return false;
-        }
-        if (isExtractionGuarded(node, tank)) {
-            return false;
-        }
-        if (!node.canUseNetwork()) {
-            node.markOutputBlocked();
-            return false;
-        }
-        GasStack remainder = node.injectGas(stored.copy(), Actionable.SIMULATE);
-        int accepted = acceptedGasAmount(stored, remainder);
-        if (accepted <= 0) {
-            node.markOutputBlocked();
-            return false;
-        }
-        if (isExtractionGuarded(node, tank)) {
-            return false;
-        }
-        GasStack expected = stored.copy();
-        expected.amount = accepted;
-        AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
-        AEPendingTransferBuffer.Entry pending = buffer.prepareGas(expected);
-        GasStack extracted;
-        try {
-            extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
-        } catch (RuntimeException | LinkageError e) {
-            buffer.cancelPrepared(pending);
-            throw e;
-        }
-        if (extracted == null || extracted.amount <= 0) {
-            buffer.cancelPrepared(pending);
-            node.markOutputBlocked();
-            return false;
-        }
-        buffer.holdGas(pending, extracted);
-        buffer.deliverToNetwork(pending, node);
-        if (buffer.contains(pending)) {
-            buffer.deliverGas(pending, stack -> tank.insert(stack, Action.EXECUTE, AutomationType.INTERNAL));
-        }
-        GasStack remaining = tank.getGas();
-        if (buffer.contains(pending) || (remaining != null && remaining.amount > 0)) {
-            node.markOutputBlocked();
-        }
-        return true;
+        MachinePort port = MachinePort.gas("ae_native_gas_output", MachinePort.Role.OUTPUT, tank);
+        return drainNativePort(node, port, port.nativeOutput());
     }
 
     /**
@@ -389,56 +417,10 @@ public final class AEUpgradeOutputDrainer {
      * @return 本次是否实际回收了流体
      */
     public static boolean drainFluidTank(AEUpgradeNode node, IExtendedFluidTank tank) {
-        if (tank == null) {
-            return false;
-        }
+        if (node == null || tank == null) return false;
         node.observeOutputContainer(tank);
-        FluidStack stored = tank.getFluid();
-        if (stored == null || stored.getFluid() == null || stored.amount <= 0) {
-            return false;
-        }
-        if (isExtractionGuarded(node, tank)) {
-            return false;
-        }
-        if (!node.canUseNetwork()) {
-            node.markOutputBlocked();
-            return false;
-        }
-        FluidStack remainder = node.injectFluid(stored.copy(), Actionable.SIMULATE);
-        int accepted = acceptedFluidAmount(stored, remainder);
-        if (accepted <= 0) {
-            node.markOutputBlocked();
-            return false;
-        }
-        if (isExtractionGuarded(node, tank)) {
-            return false;
-        }
-        FluidStack expected = stored.copy();
-        expected.amount = accepted;
-        AEPendingTransferBuffer buffer = node.getPendingTransferBuffer();
-        AEPendingTransferBuffer.Entry pending = buffer.prepareFluid(expected);
-        FluidStack extracted;
-        try {
-            extracted = tank.extract(accepted, Action.EXECUTE, AutomationType.INTERNAL);
-        } catch (RuntimeException | LinkageError e) {
-            buffer.cancelPrepared(pending);
-            throw e;
-        }
-        if (extracted == null || extracted.amount <= 0) {
-            buffer.cancelPrepared(pending);
-            node.markOutputBlocked();
-            return false;
-        }
-        buffer.holdFluid(pending, extracted);
-        buffer.deliverToNetwork(pending, node);
-        if (buffer.contains(pending)) {
-            buffer.deliverFluid(pending, stack -> tank.insert(stack, Action.EXECUTE, AutomationType.INTERNAL));
-        }
-        FluidStack remaining = tank.getFluid();
-        if (buffer.contains(pending) || (remaining != null && remaining.amount > 0)) {
-            node.markOutputBlocked();
-        }
-        return true;
+        MachinePort port = MachinePort.fluid("ae_native_fluid_output", MachinePort.Role.OUTPUT, tank);
+        return drainNativePort(node, port, port.nativeOutput());
     }
 
     private static boolean isExtractionGuarded(AEUpgradeNode node, Object container) {

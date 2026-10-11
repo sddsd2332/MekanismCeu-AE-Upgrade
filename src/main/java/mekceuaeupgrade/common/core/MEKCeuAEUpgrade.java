@@ -5,14 +5,18 @@ import mekanism.common.Mekanism;
 import mekanism.common.Version;
 import mekanism.common.base.IModule;
 import mekanism.common.config.MekanismConfig;
+import mekanism.common.recipe.RecipeHandler;
 import mekceuaeupgrade.common.item.AEUpgrade;
 import mekceuaeupgrade.common.config.AEUpgradeConfig;
 import mekceuaeupgrade.common.config.AERecipeProfileManager;
+import mekceuaeupgrade.common.host.AEWirelessTargetCache;
 import mekceuaeupgrade.common.network.MEKCeuAEUpgradePacketHandler;
 import mekceuaeupgrade.common.registries.MEKCeuAEUpgradeItems;
 import mekceuaeupgrade.common.ui.AEUpgradeWindowTypes;
 import mekceuaeupgrade.mekceuaeupgrade.Tags;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.init.Blocks;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.WorldServer;
@@ -24,10 +28,11 @@ import net.minecraftforge.fml.common.SidedProxy;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(modid = MEKCeuAEUpgrade.MODID, useMetadata = true, dependencies = "required-after:mekanism@[10.0.3.550,);required-after:appliedenergistics2;required-after:ae2fc;required-after:mekeng;required-after:mixinbooter")
+@Mod(modid = MEKCeuAEUpgrade.MODID, useMetadata = true, dependencies = "required-after:mekanism@[10.0.5.023,);required-after:appliedenergistics2;required-after:ae2fc;required-after:mekeng;required-after:mixinbooter")
 @Mod.EventBusSubscriber
 public class MEKCeuAEUpgrade implements IModule {
 
@@ -67,12 +72,24 @@ public class MEKCeuAEUpgrade implements IModule {
     public static void onWorldUnload(WorldEvent.Unload event) {
         if (event.getWorld() instanceof WorldServer) {
             AERecipeProfileManager.clearWorld(event.getWorld());
+            AEWirelessTargetCache.clear();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLocatableChanged(appeng.api.events.LocatableEventAnnounce event) {
+        if (net.minecraftforge.fml.common.FMLCommonHandler.instance().getEffectiveSide().isServer()) {
+            AEWirelessTargetCache.invalidate(event.target.getLocatableSerial());
         }
     }
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         AEUpgradeConfig.load(event.getSuggestedConfigurationFile());
+        mekanism.common.tile.component.UpgradeComponentRegistry.register(
+              mekanism.common.tile.component.UpgradeComponentRegistry.Slot.AE,
+              tile -> tile instanceof mekceuaeupgrade.common.host.IAEUpgradeHostBridge bridge
+                    ? bridge.mekceuaeupgrade$getAEUpgradeDelegate() : null);
         proxy.preInit();
     }
 

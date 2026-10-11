@@ -7,6 +7,7 @@ import appeng.api.storage.data.IAEStack;
 import appeng.fluids.util.AEFluidStack;
 import appeng.util.item.AEItemStack;
 import mekanism.api.gas.GasStack;
+import mekanism.api.processing.MachineResourceStack;
 import mekceuaeupgrade.common.host.AEUpgradeNode;
 import mekceuaeupgrade.common.recipe.AEExposedRecipe;
 import mekceuaeupgrade.common.recipe.route.AERecipeRoute;
@@ -32,6 +33,8 @@ public final class AERecipeNetworkTransferPlan {
     private final List<ExtractedInput> inputs;
     private final List<ItemStack> legacyInputs;
     private final List<NetworkOutput> outputs;
+    private final long[] inputTotals;
+    private final long[] outputTotals;
 
     /**
      * @param inputs 已解析的输入抽取项
@@ -39,6 +42,22 @@ public final class AERecipeNetworkTransferPlan {
     private AERecipeNetworkTransferPlan(List<ExtractedInput> inputs, List<NetworkOutput> outputs) {
         this.inputs = inputs;
         this.outputs = outputs;
+        inputTotals = new long[inputs.size()];
+        for (int i = 0; i < inputs.size(); i++) {
+            ExtractedInput input = inputs.get(i);
+            if (hasEquivalentInputBefore(i, input)) continue;
+            for (int j = i; j < inputs.size(); j++) {
+                if (input.isSameResource(inputs.get(j))) inputTotals[i] = addAmount(inputTotals[i], inputs.get(j).amount());
+            }
+        }
+        outputTotals = new long[outputs.size()];
+        for (int i = 0; i < outputs.size(); i++) {
+            NetworkOutput output = outputs.get(i);
+            if (hasEquivalentOutputBefore(i, output)) continue;
+            for (int j = i; j < outputs.size(); j++) {
+                if (output.isSameResource(outputs.get(j))) outputTotals[i] = addAmount(outputTotals[i], outputs.get(j).amount());
+            }
+        }
         List<ItemStack> legacy = new ArrayList<>(inputs.size());
         for (ExtractedInput input : inputs) {
             legacy.add(input.legacyStack());
@@ -75,6 +94,33 @@ public final class AERecipeNetworkTransferPlan {
         return outputs == null ? null : new AERecipeNetworkTransferPlan(Collections.unmodifiableList(inputs), outputs);
     }
 
+    /** Processing-only requests: no future output capacity participates in input admission. */
+    @Nullable
+    public static AERecipeNetworkTransferPlan fromInputs(List<MachineResourceStack> demands) {
+        List<ExtractedInput> inputs = new ArrayList<>();
+        for (MachineResourceStack demand : demands) {
+            ExtractedInput input;
+            switch (demand.kind()) {
+                case ITEM:
+                    input = itemInput(demand.itemStack());
+                    break;
+                case GAS:
+                    GasStack gas = demand.gasStack();
+                    input = gas == null ? null : new GasInput(gas, ItemStack.EMPTY);
+                    break;
+                case FLUID:
+                    FluidStack fluid = demand.fluidStack();
+                    input = fluid == null ? null : new FluidInput(fluid, ItemStack.EMPTY);
+                    break;
+                default:
+                    return null;
+            }
+            if (input == null) return null;
+            inputs.add(input);
+        }
+        return new AERecipeNetworkTransferPlan(Collections.unmodifiableList(inputs), Collections.emptyList());
+    }
+
     /**
      * 在拉取输入前预检 AE 是否能接收该配方的主要输出。
      *
@@ -87,20 +133,9 @@ public final class AERecipeNetworkTransferPlan {
         }
         for (int i = 0; i < outputs.size(); i++) {
             NetworkOutput output = outputs.get(i);
-            if (hasEquivalentOutputBefore(i, output)) {
-                continue;
-            }
-            long total = 0;
-            for (int j = i; j < outputs.size(); j++) {
-                NetworkOutput candidate = outputs.get(j);
-                if (output.isSameResource(candidate)) {
-                    total = addAmount(total, candidate.amount());
-                    if (total < 0) {
-                        return false;
-                    }
-                }
-            }
-            if (!output.canAccept(node, total)) {
+            long total = outputTotals[i];
+            if (total == 0) continue;
+            if (total < 0 || !output.canAccept(node, total)) {
                 return false;
             }
         }
@@ -142,20 +177,9 @@ public final class AERecipeNetworkTransferPlan {
         }
         for (int i = 0; i < inputs.size(); i++) {
             ExtractedInput input = inputs.get(i);
-            if (hasEquivalentInputBefore(i, input)) {
-                continue;
-            }
-            long total = 0;
-            for (int j = i; j < inputs.size(); j++) {
-                ExtractedInput candidate = inputs.get(j);
-                if (input.isSameResource(candidate)) {
-                    total = addAmount(total, candidate.amount());
-                    if (total < 0) {
-                        return false;
-                    }
-                }
-            }
-            if (!input.canExtract(node, total)) {
+            long total = inputTotals[i];
+            if (total == 0) continue;
+            if (total < 0 || !input.canExtract(node, total)) {
                 return false;
             }
         }

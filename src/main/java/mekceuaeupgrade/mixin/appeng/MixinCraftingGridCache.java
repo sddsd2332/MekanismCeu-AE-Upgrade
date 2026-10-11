@@ -19,7 +19,9 @@ import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import mekceuaeupgrade.common.host.AEWirelessCraftingProviderRegistry;
 import mekceuaeupgrade.common.integration.appeng.AEIncrementalCraftingIndex;
+import mekceuaeupgrade.common.integration.appeng.AECraftingTickGate;
 import mekceuaeupgrade.common.integration.appeng.IAEIncrementalCraftingGridCache;
+import mekceuaeupgrade.common.integration.appeng.IAEGridCacheTickGate;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,9 +39,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
+import appeng.crafting.CraftingLinkNexus;
+import appeng.me.cluster.implementations.CraftingCPUCluster;
 
 @Mixin(value = CraftingGridCache.class, remap = false)
-public abstract class MixinCraftingGridCache implements ICraftingProviderHelper, IAEIncrementalCraftingGridCache {
+public abstract class MixinCraftingGridCache implements ICraftingProviderHelper, IAEIncrementalCraftingGridCache,
+      IAEGridCacheTickGate {
 
     @Shadow
     @Final
@@ -56,12 +62,54 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
     @Shadow
     private IStorageGrid storageGrid;
 
+    @Shadow private boolean updateList;
+    @Shadow private boolean updatePatterns;
+    @Shadow @Final private Map<String, CraftingLinkNexus> craftingLinks;
+    @Shadow @Final private Set<CraftingCPUCluster> craftingCPUClusters;
+
     @Unique
     private final AEIncrementalCraftingIndex mekceuaeupgrade$incrementalCrafting = new AEIncrementalCraftingIndex();
     @Unique
     private boolean mekceuaeupgrade$recalculatingPatterns;
     @Unique
     private final Set<IAEItemStack> mekceuaeupgrade$pendingCraftabilityChanges = new LinkedHashSet<>();
+    @Unique
+    private final Predicate<IAEItemStack> mekceuaeupgrade$nativeCraftable =
+          stack -> craftableItems.containsKey(stack) || emitableItems.contains(stack);
+    @Unique
+    private final AECraftingTickGate mekceuaeupgrade$tickGate = new AECraftingTickGate();
+    @Unique
+    private long mekceuaeupgrade$tickGeneration;
+
+    @Override
+    @Unique
+    public boolean mekceuaeupgrade$isTickRequired() {
+        return mekceuaeupgrade$tickGate.isRequired();
+    }
+
+    @Inject(method = "onUpdateTick", at = @At("HEAD"), cancellable = true)
+    private void mekceuaeupgrade$skipIdleNativeTick(CallbackInfo ci) {
+        if (!mekceuaeupgrade$tickGate.isRequired()) {
+            ci.cancel();
+            return;
+        }
+        mekceuaeupgrade$tickGeneration = mekceuaeupgrade$tickGate.begin();
+    }
+
+    // Both overloads and private rebuild entry points are covered. Keep the original bodies intact.
+    @Inject(method = {"afterCacheConstruction", "addNode", "removeNode", "addLink", "onJoin", "onSplit",
+          "updatePatterns()V", "updateCPUClusters()V",
+          "updateCPUClusters(Lappeng/api/networking/events/MENetworkCraftingCpuChange;)V",
+          "updateCPUClusters(Lappeng/api/networking/events/MENetworkCraftingPatternChange;)V",
+          "addCraftingOption", "setEmitable"}, at = @At("HEAD"))
+    private void mekceuaeupgrade$wakeOnNativeChange(CallbackInfo ci) {
+        mekceuaeupgrade$tickGate.wake();
+    }
+
+    @Inject(method = "canAccept(Lappeng/api/storage/data/IAEItemStack;)Z", at = @At("HEAD"), cancellable = true)
+    private void mekceuaeupgrade$skipEmptyCPUs(IAEItemStack stack, CallbackInfoReturnable<Boolean> cir) {
+        if (craftingCPUClusters.isEmpty()) cir.setReturnValue(false);
+    }
 
     @Override
     @Unique
@@ -73,13 +121,23 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
     @Unique
     public void mekceuaeupgrade$setProviderRecipes(ICraftingProvider provider, ICraftingMedium medium,
           Collection<? extends ICraftingPatternDetails> recipes) {
-        mekceuaeupgrade$incrementalCrafting.setProviderRecipes(provider, medium, recipes);
+        try {
+            mekceuaeupgrade$incrementalCrafting.setProviderRecipes(provider, medium, recipes);
+        } finally {
+            // Wake after the synchronized mutation, so a concurrent tick cannot consume the wake first.
+            mekceuaeupgrade$tickGate.wake();
+        }
     }
 
     @Override
     @Unique
     public List<IAEItemStack> mekceuaeupgrade$removeProvider(ICraftingProvider provider) {
-        List<IAEItemStack> changed = mekceuaeupgrade$incrementalCrafting.removeProvider(provider);
+        List<IAEItemStack> changed;
+        try {
+            changed = mekceuaeupgrade$incrementalCrafting.removeProvider(provider);
+        } finally {
+            mekceuaeupgrade$tickGate.wake();
+        }
         if (!changed.isEmpty()) {
             if (mekceuaeupgrade$recalculatingPatterns) {
                 for (IAEItemStack stack : changed) {
@@ -96,7 +154,7 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
      * AE removes providers before the next crafting-cache tick. Keep the sidecar index in the
      * same lifecycle transition so a provider cannot survive an empty-grid transition.
      */
-    @Inject(method = "removeNode", at = @At("RETURN"))
+    @Inject(method = "removeNode", at = @At("RETURN"), order = 1100)
     private void mekceuaeupgrade$removeIncrementalProvider(IGridNode gridNode, IGridHost machine,
           CallbackInfo ci) {
         if (machine instanceof ICraftingProvider) {
@@ -106,6 +164,7 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
 
     @Inject(method = "recalculateCraftingPatterns", at = @At("HEAD"))
     private void mekceuaeupgrade$beginPatternRecalculation(CallbackInfo ci) {
+        mekceuaeupgrade$tickGate.wake();
         mekceuaeupgrade$recalculatingPatterns = true;
     }
 
@@ -118,12 +177,17 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
 
     @Inject(method = "onUpdateTick", at = @At("RETURN"))
     private void mekceuaeupgrade$publishIncrementalCrafting(CallbackInfo ci) {
-        List<IAEItemStack> changed = mekceuaeupgrade$incrementalCrafting.processPendingChanges(
-              stack -> craftableItems.containsKey(stack) || emitableItems.contains(stack));
-        if (!changed.isEmpty()) {
-            mekceuaeupgrade$postCraftabilityChanges(changed);
+        // Some injection combinations also visit RETURN after a cancelled HEAD. Stay asleep there.
+        if (!mekceuaeupgrade$tickGate.isRequired()) return;
+        if (mekceuaeupgrade$incrementalCrafting.hasPendingChanges()) {
+            List<IAEItemStack> changed = mekceuaeupgrade$incrementalCrafting.processPendingChanges(
+                  mekceuaeupgrade$nativeCraftable);
+            if (!changed.isEmpty()) mekceuaeupgrade$postCraftabilityChanges(changed);
         }
         mekceuaeupgrade$flushPendingCraftabilityChanges();
+        boolean hasWork = updateList || updatePatterns || !craftingLinks.isEmpty() || !craftingCPUClusters.isEmpty() ||
+              mekceuaeupgrade$incrementalCrafting.hasPendingChanges() || !mekceuaeupgrade$pendingCraftabilityChanges.isEmpty();
+        mekceuaeupgrade$tickGate.finish(mekceuaeupgrade$tickGeneration, hasWork);
     }
 
     @Unique
@@ -174,6 +238,7 @@ public abstract class MixinCraftingGridCache implements ICraftingProviderHelper,
         // reconnect that ends in craftable=true cannot be overwritten by a stale false update.
         mekceuaeupgrade$pendingCraftabilityChanges.remove(stack);
         mekceuaeupgrade$pendingCraftabilityChanges.add(stack.copy());
+        mekceuaeupgrade$tickGate.wake();
     }
 
     @ModifyArg(

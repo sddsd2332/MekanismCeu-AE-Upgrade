@@ -1,7 +1,6 @@
 package mekceuaeupgrade.mixin.mekanism;
 
 import mekanism.api.gas.Gas;
-import mekanism.api.math.MathUtils;
 import mekanism.common.MekanismFluids;
 import mekanism.common.block.states.BlockStateMachine.MachineType;
 import mekanism.common.capabilities.gas.BasicGasTank;
@@ -34,7 +33,7 @@ public abstract class MixinTileEntityChemicalDissolutionChamber extends TileEnti
     @Shadow
     private InputInventorySlot inputSlot;
     @Shadow
-    private long baseTotalUsage;
+    public abstract int getRecipeGasUsagePerOperation();
     @Unique
     private volatile AEUpgradeHostDelegate mekceuaeupgrade$aeUpgrade;
 
@@ -87,7 +86,7 @@ public abstract class MixinTileEntityChemicalDissolutionChamber extends TileEnti
 
     @Unique
     private int mekceuaeupgrade$getAEGasUsagePerOperation() {
-        return Math.max(1, MathUtils.clampToInt(baseTotalUsage));
+        return getRecipeGasUsagePerOperation();
     }
 
     @Unique
