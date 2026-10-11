@@ -139,10 +139,11 @@ public final class AERecipeProfileManager {
                   host.getAEUpgradeNode() != boundNode || nodeRevision != boundNode.getRecipeProfileIdentityRevision()) return false;
             World currentWorld = tile.getWorld();
             if (world != currentWorld || currentWorld == null || currentWorld.isRemote) return false;
+            File currentDirectory = getWorldDirectory(currentWorld);
+            if (currentDirectory == null) return false;
             if (nativeIdentity) {
                 if (saveHandler != currentWorld.getSaveHandler()) return false;
-            } else if (currentWorld.getSaveHandler() == null ||
-                  !Objects.equals(directory, currentWorld.getSaveHandler().getWorldDirectory())) return false;
+            } else if (!Objects.equals(directory, currentDirectory)) return false;
             Block currentBlock = tile.getBlockType();
             return block == currentBlock && (nativeIdentity || Objects.equals(blockName, currentBlock == null ? null : currentBlock.getRegistryName())) &&
                   metadata == tile.getBlockMetadata() &&
@@ -155,12 +156,12 @@ public final class AERecipeProfileManager {
             if (nativeIdentity && isCurrent(host, requestedType)) return profile;
             if (!(host instanceof TileEntity tile)) return null;
             World currentWorld = tile.getWorld();
-            if (currentWorld == null || currentWorld.isRemote || currentWorld.getSaveHandler() == null) {clear(); return null;}
+            File currentDirectory = getWorldDirectory(currentWorld);
+            if (currentDirectory == null) {clear(); return null;}
             AEUpgradeNode node = host.getAEUpgradeNode();
             if (node == null) {clear(); return null;}
             UUID currentOwner = ownerLookup.get(tile, node);
             if (currentOwner == null) {clear(); return null;}
-            File currentDirectory = currentWorld.getSaveHandler().getWorldDirectory();
             Block currentBlock = tile.getBlockType();
             ResourceLocation name = currentBlock == null ? null : currentBlock.getRegistryName();
             int meta = tile.getBlockMetadata();
@@ -811,11 +812,25 @@ public final class AERecipeProfileManager {
         }
     }
 
+    @Nullable
+    private static File getWorldDirectory(@Nullable World world) {
+        if (world == null || world.isRemote) {
+            return null;
+        }
+        try {
+            net.minecraft.world.storage.ISaveHandler saveHandler = world.getSaveHandler();
+            return saveHandler == null ? null : saveHandler.getWorldDirectory();
+        } catch (UnsupportedOperationException ignored) {
+            return null;
+        }
+    }
+
     public static void clearWorld(World world) {
-        if (world == null || world.isRemote || world.getSaveHandler() == null) {
+        File worldDirectory = getWorldDirectory(world);
+        if (worldDirectory == null) {
             return;
         }
-        String worldPath = world.getSaveHandler().getWorldDirectory().getAbsolutePath();
+        String worldPath = worldDirectory.getAbsolutePath();
         profiles.keySet().removeIf(identity -> identity.worldPath().equals(worldPath));
         profileRevision++;
         identityMemos.values().removeIf(entries -> entries.values().stream()
@@ -1048,14 +1063,14 @@ public final class AERecipeProfileManager {
     @Nullable
     private static ProfileIdentity resolveIdentity(TileEntity tile, @Nullable EntityPlayer player, boolean individual, AERecipeConfigType type) {
         World world = tile.getWorld();
-        if (world == null || world.isRemote || world.getSaveHandler() == null) {
+        File worldDirectory = getWorldDirectory(world);
+        if (worldDirectory == null) {
             return null;
         }
         UUID owner = resolveOwner(tile, player);
         if (owner == null) {
             return null;
         }
-        File worldDirectory = world.getSaveHandler().getWorldDirectory();
         String machineId = resolveMachineId(tile);
         AEUpgradeNode node = tile instanceof IAEUpgradeHost host ? host.getAEUpgradeNode() : null;
         if (node == null) return null;
